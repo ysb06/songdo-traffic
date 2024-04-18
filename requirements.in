@@ -1,0 +1,8 @@
+geopandas
+requests
+openpyxl
+networkx
+tables
+tqdm
+ipykernel
+seaborn
