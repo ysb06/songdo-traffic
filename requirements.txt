@@ -58,6 +58,10 @@ ipython==8.23.0
     # via ipykernel
 jedi==0.19.1
     # via ipython
+joblib==1.4.0
+    # via
+    #   mlxtend
+    #   scikit-learn
 jupyter-client==8.6.1
     # via ipykernel
 jupyter-core==5.7.2
@@ -67,11 +71,15 @@ jupyter-core==5.7.2
 kiwisolver==1.4.5
     # via matplotlib
 matplotlib==3.8.4
-    # via seaborn
+    # via
+    #   mlxtend
+    #   seaborn
 matplotlib-inline==0.1.7
     # via
     #   ipykernel
     #   ipython
+mlxtend==0.23.1
+    # via -r requirements.in
 msgpack==1.0.8
     # via blosc2
 ndindex==1.8
@@ -87,10 +95,15 @@ numpy==1.24.4
     #   blosc2
     #   contourpy
     #   matplotlib
+    #   mlxtend
     #   numexpr
     #   pandas
+    #   patsy
+    #   scikit-learn
+    #   scipy
     #   seaborn
     #   shapely
+    #   statsmodels
     #   tables
 openpyxl==3.1.2
     # via -r requirements.in
@@ -99,13 +112,18 @@ packaging==24.0
     #   geopandas
     #   ipykernel
     #   matplotlib
+    #   statsmodels
     #   tables
 pandas==2.0.3
     # via
     #   geopandas
+    #   mlxtend
     #   seaborn
+    #   statsmodels
 parso==0.8.4
     # via jedi
+patsy==0.5.6
+    # via statsmodels
 pexpect==4.9.0
     # via ipython
 pillow==10.3.0
@@ -143,6 +161,15 @@ pyzmq==26.0.0
     #   jupyter-client
 requests==2.31.0
     # via -r requirements.in
+scikit-learn==1.4.2
+    # via
+    #   -r requirements.in
+    #   mlxtend
+scipy==1.13.0
+    # via
+    #   mlxtend
+    #   scikit-learn
+    #   statsmodels
 seaborn==0.13.2
     # via -r requirements.in
 shapely==2.0.3
@@ -151,11 +178,16 @@ six==1.16.0
     # via
     #   asttokens
     #   fiona
+    #   patsy
     #   python-dateutil
 stack-data==0.6.3
     # via ipython
+statsmodels==0.14.2
+    # via -r requirements.in
 tables==3.9.2
     # via -r requirements.in
+threadpoolctl==3.4.0
+    # via scikit-learn
 tornado==6.4
     # via
     #   ipykernel

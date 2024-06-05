@@ -15,7 +15,7 @@
             "name": "Generate METR-IMC Dataset",
             "type": "debugpy",
             "request": "launch",
-            "module": "songdo_traffic.dataset.metr_imc",
+            "module": "songdo_traffic_core.dataset.metr_imc",
             "console": "integratedTerminal",
         },
         {

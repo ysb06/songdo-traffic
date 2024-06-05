@@ -14,7 +14,7 @@ parser = ArgumentParser()
 parser.add_argument(
     "--key",
     help="Path for the key file",
-    default="default",
+    default="./datasets/imcrts/key",
 )
 parser.add_argument(
     "--date_range",
@@ -29,13 +29,8 @@ parser.add_argument(
 
 args = parser.parse_args()
 start_date, end_date = args.date_range.split("-")
+api_key = load_key(args.key)
 
-if args.key == "default":
-    IMCRTSCollector(
-        start_date=start_date, end_date=end_date, output_dir=args.output_dir
-    ).collect()
-else:
-    key = load_key(args.key)
-    IMCRTSCollector(
-        key=key, start_date=start_date, end_date=end_date, output_dir=args.output_dir
-    ).collect()
+IMCRTSCollector(
+    key=api_key, start_date=start_date, end_date=end_date, output_dir=args.output_dir
+).collect()

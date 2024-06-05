@@ -22,6 +22,8 @@ class MetrImc:
 
         logger.info("Converting traffic data to METR-IMC format...")
         converted_dict, missing_links = self.__convert_raw_data(traffic_data, road_ids)
+        # Todo: converted_dict가 제대로 변환되었는지 확인 필요
+        # 정상적이라면 missing_links는 빈 리스트가 되어야 함, 이미 road_ids에서 처리를 했으므로...
 
         if missing_links:
             logger.warning(
@@ -41,20 +43,19 @@ class MetrImc:
     def road_ids(self):
         return self.data.columns.tolist()
 
-    @property
-    def notna_road_ids(self):
-        return self.data.columns[self.data.notna().any()].tolist()
-
     def __convert_raw_data(
         self, raw_traffic_data: pd.DataFrame, target_road_ids: List[str]
     ):
         temp = {road_id: {} for road_id in target_road_ids}
         missing_links = []  # For logging and debugging
 
+        # 날짜별로 묶음
         traffic_date_group = raw_traffic_data.groupby("statDate")
+        # 날짜별로 로드
         for date, group in tqdm(traffic_date_group):
+            # 시간별로 로드
             for n in range(24):
-                row_col_key = "hour{:02d}".format(n)  # 읽어들일 열 이름
+                row_col_key = "hour{:02d}".format(n)  # 읽어들일 열 이름 (ex. hour00, hour01, ...)
                 row_index = datetime.strptime(date, "%Y-%m-%d") + timedelta(
                     hours=n
                 )  # 인덱스로 사용할 날짜

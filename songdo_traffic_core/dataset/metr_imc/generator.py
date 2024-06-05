@@ -28,5 +28,5 @@ class MetrImcDatasetGenerator:
 
         # id는 교통량 데이터에 있는 것만!
         logger.info("metr_ids.txt")
-        sensor_ids = MetrIds(metr_imc.notna_road_ids)
+        sensor_ids = MetrIds(metr_imc.road_ids)
         sensor_ids.to_txt(output_dir)

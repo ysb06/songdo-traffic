@@ -164,6 +164,4 @@ cython_debug/
 datasets/*/*
 !datasets/*/README*
 
-# Playgrounds
-# Ignore all things for test or playground
-playground/
+outputs/

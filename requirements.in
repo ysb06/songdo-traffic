@@ -6,3 +6,6 @@ tables
 tqdm
 ipykernel
 seaborn
+scikit-learn
+statsmodels
+mlxtend

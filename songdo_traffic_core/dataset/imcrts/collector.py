@@ -16,18 +16,16 @@ def load_key(path: str) -> str:
         with open(path, "r") as f:
             return f.read().strip()
     except FileNotFoundError:
-        logger.error(f"Key File Not Found at {path}: You need to set your own key")
+        logger.error(f"Key File Not Found at {path}")
         return ""
 
 
 SERVICE_URL = "http://apis.data.go.kr/6280000/ICRoadVolStat/NodeLink_Trfc_DD"
-SERVICE_KEY = load_key("./datasets/imcrts/key")
 MAX_ROW_COUNT = 5000
 
 
 class IMCRTSExcelConverter:
-    """IMCRTS Collector에서 Pickle로 저장된 데이터를 Excel로 변환, openpyxl을 설치하지 못해 에러가 발생했을 때 사용
-    """
+    """IMCRTS Collector에서 Pickle로 저장된 데이터를 Excel로 변환, openpyxl을 설치하지 못해 에러가 발생했을 때 사용"""
 
     def __init__(
         self, output_dir: str = "./datasets/imcrts/", filename: str = "imcrts_data.pkl"
@@ -44,12 +42,11 @@ class IMCRTSExcelConverter:
 
 
 class IMCRTSCollector:
-    """Data.go.kr로부터 인천 도로 교통량 데이터를 특정 날짜 기간만큼 추출하고 저장
-    """
+    """Data.go.kr로부터 인천 도로 교통량 데이터를 특정 날짜 기간만큼 추출하고 저장"""
 
     def __init__(
         self,
-        key: str = SERVICE_KEY,
+        key: str,
         start_date: str = "20230101",
         end_date: str = "20231231",
         output_dir: str = "./datasets/imcrts/",
@@ -71,7 +68,7 @@ class IMCRTSCollector:
             os.path.join(self.output_dir, "imcrts_data.xlsx"),
         )
 
-    def collect(self) -> None:
+    def collect(self, ignore_empty: bool = False) -> None:
         """
         데이터를 수집하고 Pandas DataFrame형태로 변환 후 Pickle 및 Excel형태로 저장
         """
@@ -88,18 +85,24 @@ class IMCRTSCollector:
             if day_count % 20 >= -1:
                 logger.info(f"Requesting data at {current_date_string}...")
 
-            time.sleep(0.1)
+            time.sleep(0.05)
             code, data = self.get_data(self.params)
-            if code == 200 and data is not None:
-                data_list.extend(data)
+            if code == 200:
+                if data is not None:
+                    data_list.extend(data)
+                else:
+                    if ignore_empty:
+                        logger.warning("Skipping...")
+                    else:
+                        logger.error("Aborted due to empty data")
+                        break
             else:
-                logger.error(f"Error Code: {code}")
+                logger.error(f"Code: {code}")
                 logger.error(f"Failed to Getting Data at [{current_date_string}]")
                 logger.error(f"Collecting Data Aborted!")
                 break
 
             current_date += timedelta(days=1)
-            
 
         df = pd.DataFrame(data_list)
         logger.info(f"Total Row Count: {len(df)}")
@@ -130,6 +133,12 @@ class IMCRTSCollector:
                 if "SERVICE_KEY_IS_NOT_REGISTERED_ERROR" in res.text:
                     logger.error("You may use not valid service key")
                 return 0, []
+
+            if raw["response"]["header"]["resultCode"] != "00":
+                logger.warning(
+                    f"Error Code: {raw['response']['header']['resultCode']}. You need to check the reason of error."
+                )
+
             if len(raw["response"]["body"]["items"]) > 0:
                 data = raw["response"]["body"]["items"]
 
