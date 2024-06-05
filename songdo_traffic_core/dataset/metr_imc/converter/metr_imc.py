@@ -36,12 +36,15 @@ class MetrImc:
         if remove_empty:
             self.data = self.data.loc[:, self.notna_road_ids]
 
-
         logger.info("Complete")
 
     @property
     def road_ids(self):
         return self.data.columns.tolist()
+
+    @property
+    def notna_road_ids(self):
+        return self.data.columns[self.data.notna().any()].tolist()
 
     def __convert_raw_data(
         self, raw_traffic_data: pd.DataFrame, target_road_ids: List[str]
@@ -55,7 +58,9 @@ class MetrImc:
         for date, group in tqdm(traffic_date_group):
             # 시간별로 로드
             for n in range(24):
-                row_col_key = "hour{:02d}".format(n)  # 읽어들일 열 이름 (ex. hour00, hour01, ...)
+                row_col_key = "hour{:02d}".format(
+                    n
+                )  # 읽어들일 열 이름 (ex. hour00, hour01, ...)
                 row_index = datetime.strptime(date, "%Y-%m-%d") + timedelta(
                     hours=n
                 )  # 인덱스로 사용할 날짜

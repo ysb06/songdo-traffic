@@ -3,7 +3,7 @@ import logging
 import geopandas as gpd
 import pandas as pd
 
-from .converter import AdjacencyMatrix, GraphSensorLocations, MetrIds, MetrImc
+from .converter import AdjacencyMatrix, GraphSensorLocations, MetrIds, MetrImc, DistancesImc
 
 logger = logging.getLogger(__name__)
 
@@ -17,10 +17,6 @@ class MetrImcDatasetGenerator:
         self.traffic_df = pd.read_pickle(f"{imcrts_dir}/imcrts_data.pkl")
 
     def generate(self, output_dir: str):
-        logger.info("graph_sensor_locations.csv")
-        sensor_loc = GraphSensorLocations(self.road_gdf)
-        sensor_loc.to_csv(output_dir)
-
         logger.info("metr-imc.h5")
         metr_imc = MetrImc(self.traffic_df, self.road_gdf)
         metr_imc.to_hdf(output_dir)
@@ -30,3 +26,11 @@ class MetrImcDatasetGenerator:
         logger.info("metr_ids.txt")
         sensor_ids = MetrIds(metr_imc.road_ids)
         sensor_ids.to_txt(output_dir)
+
+        logger.info("graph_sensor_locations.csv")
+        sensor_loc = GraphSensorLocations(self.road_gdf, metr_imc.road_ids)
+        sensor_loc.to_csv(output_dir)
+
+        logger.info("distances_imc_2023.csv")
+        distances_imc = DistancesImc(self.road_gdf, self.turninfo_gdf, metr_imc.road_ids)
+        distances_imc.to_csv(output_dir)
