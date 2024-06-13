@@ -2,6 +2,8 @@ from typing import List
 import pandas as pd
 import numpy as np
 import logging
+import pickle
+from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
@@ -16,12 +18,18 @@ class AdjacencyMatrix:
     ) -> None:
         self.distance_df = distances
         self.sensor_ids = sensor_ids
+        self.adj_mx, self.sendsor_id_to_ind = self.__get_adjacency_matrix(self.distance_df, self.sensor_ids)
 
     def to_pickle(self, dir_path: str) -> None:
-        pass
+        packs = []
+        packs.append(self.sensor_ids)
+        packs.append(self.sendsor_id_to_ind)
+        packs.append(self.adj_mx)
+        with open(f"{dir_path}/adj_mx.pkl", "wb") as f:
+            pickle.dump(packs, f)
 
-    def get_adjacency_matrix(
-        distance_df: pd.DataFrame, sensor_ids: List[str], normalized_k=0.1
+    def __get_adjacency_matrix(
+        self, distance_df: pd.DataFrame, sensor_ids: List[str], normalized_k=0.1
     ):
         """
         :param normalized_k: entries that become lower than normalized_k after normalization are set to zero for sparsity.
@@ -35,7 +43,9 @@ class AdjacencyMatrix:
         for i, sensor_id in enumerate(sensor_ids):
             sensor_id_to_ind[sensor_id] = i
         # Fills cells in the matrix with distances.
-        for row in distance_df.values:
+        for row in tqdm(
+            distance_df.values, total=len(distance_df), desc="Filling matrix"
+        ):
             if row[0] not in sensor_id_to_ind or row[1] not in sensor_id_to_ind:
                 continue
             dist_mx[sensor_id_to_ind[row[0]], sensor_id_to_ind[row[1]]] = row[2]
@@ -50,4 +60,4 @@ class AdjacencyMatrix:
         # Sets entries that lower than a threshold, i.e., k, to zero for sparsity.
         adj_mx[adj_mx < normalized_k] = 0
 
-        return adj_mx
+        return adj_mx, sensor_id_to_ind
