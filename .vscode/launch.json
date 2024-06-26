@@ -8,7 +8,7 @@
             "name": "Run Project",
             "type": "debugpy",
             "request": "launch",
-            "module": "songdo_traffic",
+            "module": "songdo_traffic_core",
             "console": "integratedTerminal"
         },
         {

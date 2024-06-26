@@ -5,7 +5,6 @@
 		}
 	],
 	"settings": {
-		"jupyter.notebookFileRoot": "${workspaceFolder}",
-		"notebook.output.textLineLimit": 64
+		"python.envFile": "${workspaceFolder}/.env",
 	}
 }
