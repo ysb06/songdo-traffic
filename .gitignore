@@ -161,7 +161,7 @@ cython_debug/
 
 # Others
 .DS_Store
-datasets/*/*
+datasets/*
 !datasets/*/README*
 
 outputs/

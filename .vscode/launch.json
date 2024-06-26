@@ -15,22 +15,7 @@
             "name": "Generate METR-IMC Dataset",
             "type": "debugpy",
             "request": "launch",
-            "module": "songdo_traffic_core.dataset.metr_imc",
-            "console": "integratedTerminal",
-        },
-        {
-            "name": "Collect Incheon Traffic Data",
-            "type": "debugpy",
-            "request": "launch",
-            "module": "songdo_traffic.dataset.imcrts",
-            "console": "integratedTerminal",
-            "args": ["--date_range", "20231225-20231231"]
-        },
-        {
-            "name": "Generate Incheon Node-Link",
-            "type": "debugpy",
-            "request": "launch",
-            "module": "songdo_traffic.dataset.nodelink",
+            "module": "songdo_traffic_core.dataset",
             "console": "integratedTerminal",
         },
         {

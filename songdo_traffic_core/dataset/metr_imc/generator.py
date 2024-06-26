@@ -1,22 +1,35 @@
 import logging
+import os
 
 import geopandas as gpd
 import pandas as pd
 
-from .converter import AdjacencyMatrix, GraphSensorLocations, MetrIds, MetrImc, DistancesImc
+from .converter import (
+    AdjacencyMatrix,
+    GraphSensorLocations,
+    MetrIds,
+    MetrImc,
+    DistancesImc,
+)
 
 logger = logging.getLogger(__name__)
 
 
 class MetrImcDatasetGenerator:
     def __init__(self, nodelink_dir: str, imcrts_dir: str) -> None:
-        self.intersection_gdf = gpd.read_file(f"{nodelink_dir}/imc_node.shp")
-        self.road_gdf = gpd.read_file(f"{nodelink_dir}/imc_link.shp")
-        self.turninfo_gdf = gpd.read_file(f"{nodelink_dir}/imc_turninfo.shp")
+        self.intersection_gdf = gpd.read_file(
+            os.path.join(nodelink_dir, "imc_node.shp")
+        )
+        self.road_gdf = gpd.read_file(os.path.join(nodelink_dir, "imc_link.shp"))
+        self.turninfo_gdf = gpd.read_file(
+            os.path.join(nodelink_dir, "imc_turninfo.shp")
+        )
 
-        self.traffic_df = pd.read_pickle(f"{imcrts_dir}/imcrts_data.pkl")
+        self.traffic_df = pd.read_pickle(os.path.join(imcrts_dir, "imcrts_data.pkl"))
 
     def generate(self, output_dir: str):
+        os.makedirs(os.path.join(output_dir, "miscellaneous"), exist_ok=True)
+
         logger.info("metr-imc.h5")
         metr_imc = MetrImc(self.traffic_df, self.road_gdf)
         metr_imc.to_hdf(output_dir)
@@ -32,7 +45,9 @@ class MetrImcDatasetGenerator:
         sensor_loc.to_csv(output_dir)
 
         logger.info("distances_imc_2023.csv")
-        distances_imc = DistancesImc(self.road_gdf, self.turninfo_gdf, metr_imc.road_ids)
+        distances_imc = DistancesImc(
+            self.road_gdf, self.turninfo_gdf, metr_imc.road_ids
+        )
         distances_imc.to_csv(output_dir)
 
         logger.info("adj_mx.pkl")
