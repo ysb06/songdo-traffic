@@ -1,3 +1,4 @@
+import os
 from typing import List, Optional
 import geopandas as gpd
 import pandas as pd
@@ -16,7 +17,9 @@ def calculate_mean_coords(geometry):
 
 
 class GraphSensorLocations:
-    def __init__(self, road_data: gpd.GeoDataFrame, target_ids: Optional[List[str]] = None) -> None:
+    def __init__(
+        self, road_data: gpd.GeoDataFrame, target_ids: Optional[List[str]] = None
+    ) -> None:
         road_data = road_data.to_crs(epsg=4326)
 
         self.result = pd.DataFrame(columns=["sensor_id", "latitude", "longitude"])
@@ -27,11 +30,10 @@ class GraphSensorLocations:
         if target_ids is not None:
             self.result = self.result[self.result["sensor_id"].isin(target_ids)]
 
-    def to_csv(self, dir_path: str) -> None:
-        logger.info(
-            f"Saving sensor locations to {dir_path}/graph_sensor_locations.csv..."
-        )
-        self.result.to_csv(
-            f"{dir_path}/graph_sensor_locations.csv", index_label="index"
-        )
+    def to_csv(
+        self, dir_path: str, filename: str = "graph_sensor_locations.csv"
+    ) -> None:
+        path = os.path.join(dir_path, filename)
+        logger.info(f"Saving sensor locations to {path}...")
+        self.result.to_csv(path, index_label="index")
         logger.info("Complete")

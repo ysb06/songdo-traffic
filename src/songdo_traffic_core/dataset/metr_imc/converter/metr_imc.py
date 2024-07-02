@@ -5,6 +5,7 @@ import numpy as np
 from tqdm import tqdm
 from datetime import datetime, timedelta
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -90,12 +91,12 @@ class MetrImc:
             self.data.loc[:, index_values],
         )
 
-    def to_hdf(self, dir_path: str) -> None:
-        logger.info(f"Saving METR-IMC data to {dir_path}/metr_imc.h5...")
-        self.data.to_hdf(f"{dir_path}/metr-imc.h5", key="data")
+    def to_hdf(self, dir_path: str, filename: str = "metr-imc.h5") -> None:
+        logger.info(f"Saving METR-IMC data to {os.path.join(dir_path, filename)}...")
+        self.data.to_hdf(os.path.join(dir_path, filename), key="data")
         logger.info("Complete")
 
-    def to_excel(self, dir_path: str) -> None:
-        logger.info(f"Saving METR-IMC data to {dir_path}/metr_imc.xlsx")
-        self.data.to_excel(f"{dir_path}/metr-imc.xlsx")
+    def to_excel(self, dir_path: str, filename: str = "metr-imc.xlsx") -> None:
+        logger.info(f"Saving METR-IMC data to {os.path.join(dir_path, filename)}...")
+        self.data.to_excel(os.path.join(dir_path, filename))
         logger.info("Complete")

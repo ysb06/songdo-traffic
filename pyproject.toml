@@ -1,0 +1,28 @@
+[tool.poetry]
+name = "songdo-traffic"
+version = "0.1.0"
+description = ""
+authors = ["Seungbin Yim <ysb06@hotmail.com>"]
+readme = "README.md"
+packages = [{include = "songdo_traffic_core", from = "src"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+numpy = "^1.26.4"
+requests = "^2.32.3"
+tables = "^3.9.2"
+torch = "^2.3.1"
+torchvision = "^0.18.1"
+torchaudio = "^2.3.1"
+geopandas = "^1.0.0"
+tqdm = "^4.66.4"
+seaborn = "^0.13.2"
+ipykernel = "^6.29.4"
+scikit-learn = "^1.5.0"
+openpyxl = "^3.1.5"
+missingno = "^0.5.2"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

@@ -1,3 +1,4 @@
+import os
 from typing import List
 import geopandas as gpd
 import pandas as pd
@@ -124,7 +125,8 @@ class DistancesImc:
                     )
         return G
 
-    def to_csv(self, dir_path: str) -> None:
-        logger.info(f"Saving distances data to {dir_path}/distances_imc_2024.csv...")
-        self.distances.to_csv(f"{dir_path}/distances_imc_2024.csv", index=False)
+    def to_csv(self, dir_path: str, filename: str = "distances_imc_2024.csv") -> None:
+        file_path = os.path.join(dir_path, filename)
+        logger.info(f"Saving distances data to {file_path}...")
+        self.distances.to_csv(file_path, index=False)
         logger.info("Complete")

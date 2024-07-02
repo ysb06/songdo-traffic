@@ -1,11 +1,40 @@
-from typing import Dict, Set
+from typing import Dict, List, Optional, Set
 import pandas as pd
 import geopandas as gpd
 from shapely.geometry import LineString, Point
 from tqdm import tqdm
+import os
 
 
-class SensorLink:
+class SensorView:
+    def __init__(self, graph_sensor_locations_path: str) -> None:
+        self.gdf_raw = self.__get_node_gpd(graph_sensor_locations_path)
+        self.column_filter: Optional[List[str]] = None
+
+    def __get_node_gpd(self, graph_sensor_locations_path: str) -> gpd.GeoDataFrame:
+        gsl_df = pd.read_csv(
+            graph_sensor_locations_path,
+            index_col="index",
+            dtype={"sensor_id": str, "longitude": float, "latitude": float},
+        )
+        return gpd.GeoDataFrame(
+            gsl_df["sensor_id"],
+            geometry=gpd.points_from_xy(gsl_df["longitude"], gsl_df["latitude"]),
+            crs="EPSG:4326",
+        )
+
+    def set_filter(self, columns: List[str]) -> None:
+        self.column_filter = columns
+
+    def export_to_file(self, folder_path: str, file_name: str) -> None:
+        if self.column_filter is not None:
+            result = self.gdf_raw[self.gdf_raw["sensor_id"].isin(self.column_filter)]
+        else:
+            result = self.gdf_raw
+        result.to_file(os.path.join(folder_path, file_name), encoding="utf-8")
+
+
+class SensorNetworkView:
     def __init__(self, distance_csv_path: str, sensor_loc_csv_path: str) -> None:
         self.sensor_distance_df = pd.read_csv(distance_csv_path)
         self.sensor_location_df = pd.read_csv(sensor_loc_csv_path, index_col="index")
@@ -65,10 +94,11 @@ class SensorLink:
             data["T_NODE"].append(to_node)
             data["COST"].append(cost)  # This may same as geometry length
             data["geometry"].append(link_line)
-            
+
         data = gpd.GeoDataFrame(data, crs="EPSG:4326")
 
         return data
+
 
 # METR-LA의 속도는 mile/h라고 하지만, Distance의 경우 m 단위로 보임
 # 아마도 Distance의 경우 처음 데이터 이후에 추가된 것으로 보임

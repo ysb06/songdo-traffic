@@ -43,8 +43,6 @@ class IMCRTSExcelConverter:
 
 
 class IMCRTSCollector:
-    """Data.go.kr로부터 인천 도로 교통량 데이터를 특정 날짜 기간만큼 추출하고 저장"""
-
     def __init__(
         self,
         key: str,

@@ -1,14 +1,11 @@
 import logging
 import os
 
-from dotenv import load_dotenv
-
 from .imcrts.collector import IMCRTSCollector
 from .metr_imc.generator import MetrImcDatasetGenerator
 from .nodelink.converter import INCHEON_CODE, NodeLink
 from .utils import download_data, extract_file
 
-load_dotenv()
 logger = logging.getLogger(__name__)
 
 

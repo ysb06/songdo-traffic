@@ -57,17 +57,17 @@ class NodeLinkData:
 
 
 class NodeLink(NodeLinkData):
-    def __init__(self, root_path) -> None:
+    def __init__(self, root_path, encoding="cp949") -> None:
         self.node_path = os.path.join(root_path, "MOCT_NODE.shp")
         self.link_path = os.path.join(root_path, "MOCT_LINK.shp")
         self.turn_path = os.path.join(root_path, "TURNINFO.dbf")
 
         logger.info("Loading node data...")
-        node_data: gpd.GeoDataFrame = gpd.read_file(self.node_path, encoding="cp949")
+        node_data: gpd.GeoDataFrame = gpd.read_file(self.node_path, encoding=encoding)
         logger.info("Loading link data...")
-        link_data: gpd.GeoDataFrame = gpd.read_file(self.link_path, encoding="cp949")
+        link_data: gpd.GeoDataFrame = gpd.read_file(self.link_path, encoding=encoding)
         logger.info("Loading turning data...")
-        turn_data: gpd.GeoDataFrame = gpd.read_file(self.turn_path, encoding="cp949")
+        turn_data: gpd.GeoDataFrame = gpd.read_file(self.turn_path, encoding=encoding)
 
         super().__init__(node_data, link_data, turn_data)
 
