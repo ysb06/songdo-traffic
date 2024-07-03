@@ -23,6 +23,9 @@ openpyxl = "^3.1.5"
 missingno = "^0.5.2"
 
 
+[tool.poetry.group.dev.dependencies]
+flake8 = "^7.1.0"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"

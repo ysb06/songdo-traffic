@@ -13,8 +13,8 @@ class MetrIds:
     def import_from_traffic_data(self, traffic_data: pd.DataFrame) -> None:
         self.ids = traffic_data.columns.tolist()
 
-    def to_txt(self, dir_path: str, filename: str) -> None:
-        logger.info(f"Saving METR-IMC IDs to {dir_path}/metr_ids.txt...")
+    def to_txt(self, dir_path: str, filename: str = "metr_ids.txt") -> None:
+        logger.info(f"Saving METR-IMC IDs to {os.path.join(dir_path, filename)}...")
         ids_str = ",".join(str(id) for id in self.ids)
         with open(os.path.join(dir_path, filename), "w") as file:
             file.write(ids_str)
