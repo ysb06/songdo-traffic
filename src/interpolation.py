@@ -14,7 +14,7 @@ generator = MetrImcSubsetGenerator(
     metr_imc_dir="./datasets/metr-imc/",
 )
 
-interpolator = IterativeRandomForestInterpolator(verbose=50)
+interpolator = IterativeRandomForestInterpolator(verbose=1)
 
 generator.generate_subset(
     less_500_missing_columns, "./datasets/metr-imc-296", interpolator,

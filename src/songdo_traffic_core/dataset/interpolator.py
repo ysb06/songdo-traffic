@@ -14,23 +14,25 @@ class IterativeRandomForestInterpolator(InterpolatorBase):
     def __init__(
         self,
         random_state: Union[int, Tuple[int, int]] = 42,
-        max_iter: int = 5,
+        max_iter: int = 10,
         imputation_order: Literal[
             "ascending", "descending", "roman", "arabic", "random"
         ] = "ascending",
         verbose: int = 5,
+        n_jobs: int = 8,
     ) -> None:
         if isinstance(random_state, int):
             random_state = (random_state, random_state)
 
         self.estimator = RandomForestRegressor(
-            random_state=random_state[0], n_jobs=-1, verbose=50
+            random_state=random_state[0], n_jobs=n_jobs, verbose=verbose
         )
         self.iterative_imputer = IterativeImputer(
             estimator=self.estimator,
             verbose=verbose,
             imputation_order=imputation_order,
             random_state=random_state[1],
+            max_iter=max_iter
         )
 
     def interpolate(self, df: pd.DataFrame) -> pd.DataFrame:
