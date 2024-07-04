@@ -18,16 +18,17 @@ class IterativeRandomForestInterpolator(InterpolatorBase):
         imputation_order: Literal[
             "ascending", "descending", "roman", "arabic", "random"
         ] = "ascending",
-        verbose: int = 3,
+        verbose: int = 5,
     ) -> None:
         if isinstance(random_state, int):
             random_state = (random_state, random_state)
 
-        self.estimator = RandomForestRegressor(random_state=random_state[0])
+        self.estimator = RandomForestRegressor(
+            random_state=random_state[0], n_jobs=-1, verbose=50
+        )
         self.iterative_imputer = IterativeImputer(
             estimator=self.estimator,
             verbose=verbose,
-            max_iter=max_iter,
             imputation_order=imputation_order,
             random_state=random_state[1],
         )

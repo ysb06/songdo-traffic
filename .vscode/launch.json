@@ -19,6 +19,13 @@
             "console": "integratedTerminal",
         },
         {
+            "name": "Extract subset and Interpolate Dataset",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "./src/interpolation.py",
+            "console": "integratedTerminal",
+        },
+        {
             "name": "Python Debugger: Current File",
             "type": "debugpy",
             "request": "launch",
