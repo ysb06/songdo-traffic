@@ -32,7 +32,7 @@ class IterativeRandomForestInterpolator(InterpolatorBase):
             verbose=verbose,
             imputation_order=imputation_order,
             random_state=random_state[1],
-            max_iter=max_iter
+            max_iter=max_iter,
         )
 
     def interpolate(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -42,8 +42,12 @@ class IterativeRandomForestInterpolator(InterpolatorBase):
 
 class LinearInterpolator(InterpolatorBase):
     def interpolate(self, df: pd.DataFrame) -> pd.DataFrame:
-        return df.interpolate(method="linear", axis=0)
+        return df.interpolate(method="linear", axis=0, limit_direction="both")
 
+
+class SplineInterpolator(InterpolatorBase):
+    def interpolate(self, df: pd.DataFrame) -> pd.DataFrame:
+        return df.interpolate(method="spline", order=3, axis=0)
 
 class TotalMeanFillInterpolator(InterpolatorBase):
     def interpolate(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -56,3 +60,7 @@ class ColumnMeanFillInterpolator(InterpolatorBase):
 
     def interpolate(self, df: pd.DataFrame) -> pd.DataFrame:
         return df.apply(self.__fill_column_mean, axis=0)
+
+
+if __name__ == "__main__":
+    pass

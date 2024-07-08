@@ -87,7 +87,7 @@ class MetrImcSubsetGenerator:
         self.turninfo_gdf = gpd.read_file(
             os.path.join(nodelink_dir, turninfo_gdf_filename)
         )
-        self.imcrts_df = pd.read_pickle(os.path.join(imcrts_dir, imcrts_filename))
+        self.imcrts_df: pd.DataFrame = pd.read_pickle(os.path.join(imcrts_dir, imcrts_filename))
 
         self.metr_imc_path = os.path.join(metr_imc_dir, metr_imc_filename)
         self.metr_imc_df: Optional[pd.DataFrame] = None

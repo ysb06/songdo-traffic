@@ -5,24 +5,17 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Run Project",
+            "name": "Run Training STGCN Model",
             "type": "debugpy",
             "request": "launch",
-            "module": "songdo_traffic_core",
-            "console": "integratedTerminal"
+            "module": "songdo_stgcn",
+            "console": "integratedTerminal",
         },
         {
             "name": "Generate METR-IMC Dataset",
             "type": "debugpy",
             "request": "launch",
             "module": "songdo_traffic_core.dataset",
-            "console": "integratedTerminal",
-        },
-        {
-            "name": "Extract subset and Interpolate Dataset",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "./src/interpolation.py",
             "console": "integratedTerminal",
         },
         {
