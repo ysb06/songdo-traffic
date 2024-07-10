@@ -77,14 +77,15 @@ parser.add_argument(
 args = parser.parse_args()
 dataset_name = os.path.split(args.tsfilepath)[1].split(".")[0]
 run_name = f"{dataset_name}_STGCN_WAVE_{datetime.now().strftime('%y%m%d_%H%M%S')}"
-wandb.init(project=args.wandb_project, entity=args.wandb_entity, name=run_name, config=args)
+wandb.init(project='METR-IMC', name=run_name, config=args)
 
-if args.enable_cuda and torch.cuda.is_available():
+if torch.cuda.is_available():
     device = torch.device('cuda')
-    torch.cuda.empty_cache() # Clean cache
-elif args.enable_cuda and torch.backends.mps.is_available():
-    device = torch.device('mps')
-    torch.mps.empty_cache() # Clean cache
+#     torch.cuda.empty_cache() # Clean cache
+# elif torch.backends.mps.is_available():
+#     device = torch.device('mps')
+#     torch.mps.empty_cache() # Clean cache
+## DGL does not support MPS
 else:
     device = torch.device('cpu')
     gc.collect() # Clean cache
