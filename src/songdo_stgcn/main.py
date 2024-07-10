@@ -9,14 +9,16 @@ import tqdm
 import numpy as np
 import pandas as pd
 from sklearn import preprocessing
+from datetime import datetime
 
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.utils as utils
+import wandb
 
-from . import dataloader, utility, earlystopping, opt
-from . import modules
+from .script import dataloader, utility, earlystopping, opt
+from .model import models
 
 #import nni
 
@@ -60,6 +62,8 @@ def get_parameters():
     parser.add_argument('--step_size', type=int, default=10)
     parser.add_argument('--gamma', type=float, default=0.95)
     parser.add_argument('--patience', type=int, default=10, help='early stopping patience')
+    parser.add_argument('--wandb_project', type=str, default='METR-IMC', help='Weights & Biases project name')
+    parser.add_argument('--wandb_entity', type=str, default=None, help='Weights & Biases entity name')
     args = parser.parse_args()
     print('Training configs: {}'.format(args))
 
@@ -73,6 +77,9 @@ def get_parameters():
         # 'cuda' ≡ 'cuda:0'
         device = torch.device('cuda')
         torch.cuda.empty_cache() # Clean cache
+    elif args.enable_cuda and torch.backends.mps.is_available():
+        device = torch.device('mps')
+        torch.mps.empty_cache() # Clean cache
     else:
         device = torch.device('cpu')
         gc.collect() # Clean cache
@@ -102,7 +109,7 @@ def data_preparate(args, device):
     gso = gso.astype(dtype=np.float32)
     args.gso = torch.from_numpy(gso).to(device)
 
-    dataset_path = './data'
+    dataset_path = './datasets/stgcn/'
     dataset_path = os.path.join(dataset_path, args.dataset)
     data_col = pd.read_csv(os.path.join(dataset_path, 'vel.csv')).shape[0]
     # recommended dataset split rate as train: val: test = 60: 20: 20, 70: 15: 15 or 80: 10: 10
@@ -132,17 +139,17 @@ def data_preparate(args, device):
 
     return n_vertex, zscore, train_iter, val_iter, test_iter
 
-def prepare_model(args, blocks, n_vertex):
+def prepare_model(args, blocks, n_vertex, device):
     loss = nn.MSELoss()
     es = earlystopping.EarlyStopping(delta=0.0, 
                                      patience=args.patience, 
                                      verbose=True, 
-                                     path="STCGN_" + args.dataset + ".pt")
+                                     path="./outputs/STGCN_" + args.dataset + ".pt")
 
     if args.graph_conv_type == 'cheb_graph_conv':
-        model = modules.STGCNChebGraphConv(args, blocks, n_vertex).to(device)
+        model = models.STGCNChebGraphConv(args, blocks, n_vertex).to(device)
     else:
-        model = modules.STGCNGraphConv(args, blocks, n_vertex).to(device)
+        model = models.STGCNGraphConv(args, blocks, n_vertex).to(device)
 
     if args.opt == "adamw":
         optimizer = optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay_rate)
@@ -161,7 +168,7 @@ def train(args, model, loss, optimizer, scheduler, es, train_iter, val_iter):
     for epoch in range(args.epochs):
         l_sum, n = 0.0, 0  # 'l_sum' is epoch sum loss, 'n' is epoch instance number
         model.train()
-        for x, y in tqdm.tqdm(train_iter):
+        for x, y in tqdm.tqdm(train_iter, desc="Training"):
             optimizer.zero_grad()
             y_pred = model(x).view(len(x), -1)  # [batch_size, num_nodes]
             l = loss(y_pred, y)
@@ -169,12 +176,26 @@ def train(args, model, loss, optimizer, scheduler, es, train_iter, val_iter):
             optimizer.step()
             l_sum += l.item() * y.shape[0]
             n += y.shape[0]
+            wandb.log({"train_loss": l})
         scheduler.step()
+        epoch_loss = l_sum / n
         val_loss = val(model, val_iter)
+        
         # GPU memory usage
         gpu_mem_alloc = torch.cuda.max_memory_allocated() / 1000000 if torch.cuda.is_available() else 0
+        gpu_mem_alloc = torch.mps.current_allocated_memory() / 1000000 if torch.backends.mps.is_available() else gpu_mem_alloc
+        
+        # Log metrics to wandb
+        wandb.log({
+            "epoch": epoch + 1,
+            "epoch_loss": epoch_loss,
+            "val_loss": val_loss,
+            "learning_rate": optimizer.param_groups[0]['lr'],
+            "gpu_memory": gpu_mem_alloc
+        })
+        
         print('Epoch: {:03d} | Lr: {:.20f} |Train loss: {:.6f} | Val loss: {:.6f} | GPU occupy: {:.6f} MiB'.\
-            format(epoch+1, optimizer.param_groups[0]['lr'], l_sum / n, val_loss, gpu_mem_alloc))
+            format(epoch+1, optimizer.param_groups[0]['lr'], epoch_loss, val_loss, gpu_mem_alloc))
 
         es(val_loss, model)
         if es.early_stop:
@@ -195,12 +216,20 @@ def val(model, val_iter):
 
 @torch.no_grad() 
 def test(zscore, loss, model, test_iter, args):
-    model.load_state_dict(torch.load("STGCN_" + args.dataset + ".pt"))
+    model.load_state_dict(torch.load("./outputs/STGCN_" + args.dataset + ".pt"))
     model.eval()
 
     test_MSE = utility.evaluate_model(model, loss, test_iter)
     test_MAE, test_RMSE, test_WMAPE = utility.evaluate_metric(model, test_iter, zscore)
     print(f'Dataset {args.dataset:s} | Test loss {test_MSE:.6f} | MAE {test_MAE:.6f} | RMSE {test_RMSE:.6f} | WMAPE {test_WMAPE:.8f}')
+    
+    # Log final test metrics to wandb
+    wandb.log({
+        "test_MSE": test_MSE,
+        "test_MAE": test_MAE,
+        "test_RMSE": test_RMSE,
+        "test_WMAPE": test_WMAPE
+    })
 
 if __name__ == "__main__":
     # Logging
@@ -212,7 +241,24 @@ if __name__ == "__main__":
     warnings.filterwarnings("ignore", category=UserWarning)
 
     args, device, blocks = get_parameters()
+    
+    # Initialize wandb
+    run_name = f"{args.dataset}_STGCN_{datetime.now().strftime('%y%m%d_%H%M%S')}"
+    wandb.init(project=args.wandb_project, entity=args.wandb_entity, name=run_name, config=args)
+    wandb.config.update({
+        "model_type": "STGCNChebGraphConv" if args.graph_conv_type == 'cheb_graph_conv' else "STGCNGraphConv",
+        "device": str(device),
+        "blocks": blocks
+    })
+    
     n_vertex, zscore, train_iter, val_iter, test_iter = data_preparate(args, device)
-    loss, es, model, optimizer, scheduler = prepare_model(args, blocks, n_vertex)
+    loss, es, model, optimizer, scheduler = prepare_model(args, blocks, n_vertex, device)
+    
+    # Log model architecture
+    wandb.watch(model)
+    
     train(args, model, loss, optimizer, scheduler, es, train_iter, val_iter)
     test(zscore, loss, model, test_iter, args)
+    
+    # Close wandb run
+    wandb.finish()
