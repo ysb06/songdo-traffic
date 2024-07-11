@@ -1,19 +1,17 @@
 import logging
 import os
-from typing import Any, Callable, List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 import geopandas as gpd
 import pandas as pd
 
 from songdo_traffic_core.dataset.interpolator import InterpolatorBase
 
-from .converter import (
-    AdjacencyMatrix,
-    GraphSensorLocations,
-    MetrIds,
-    MetrImc,
-    DistancesImc,
-)
+from .base import MetrImc
+from .converter.adj_mx import AdjacencyMatrix
+from .converter.distance_imc import DistancesImc
+from .converter.graph_sensor_locations import GraphSensorLocations
+from .converter.metr_ids import MetrIds
 
 logger = logging.getLogger(__name__)
 

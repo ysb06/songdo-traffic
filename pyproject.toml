@@ -7,13 +7,10 @@ readme = "README.md"
 packages = [{include = "songdo_traffic_core", from = "src"}]
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = "~3.11"
 numpy = "^1.26.4"
 requests = "^2.32.3"
 tables = "^3.9.2"
-torch = "2.2.1"
-torchvision = "0.17.1"
-torchaudio = "2.2.1"
 geopandas = "^1.0.0"
 tqdm = "^4.66.4"
 seaborn = "^0.13.2"
