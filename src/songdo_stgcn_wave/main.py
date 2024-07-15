@@ -97,9 +97,12 @@ with open(args.sensorsfilepath) as f:
 
 distance_df = pd.read_csv(args.disfilepath, dtype={"from": "str", "to": "str"})
 
+print("Creating adjacency matrix...")
 adj_mx = get_adjacency_matrix(distance_df, sensor_ids)
+print("Creating graph...")
 sp_mx = sp.coo_matrix(adj_mx)
 G = dgl.from_scipy(sp_mx)
+print("Creating graph done.")
 
 
 df = pd.read_hdf(args.tsfilepath)
