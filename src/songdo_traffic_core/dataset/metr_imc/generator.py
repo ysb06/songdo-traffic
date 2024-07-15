@@ -125,14 +125,6 @@ class MetrImcSubsetGenerator:
         else:
             logger.warning(f"{self.adj_mx_path} not found.")
 
-    def generate_metr_imc(self, to_hdf: bool = True) -> pd.DataFrame:
-        logger.info("Generating new metr-imc.h5...")
-        metr_imc = MetrImc(self.imcrts_df, self.roads_gdf)
-        if to_hdf:
-            metr_imc.to_hdf(self.metr_imc_path)
-
-        return metr_imc.data
-
     def process_metr_imc(
         self,
         targets: Optional[List[str]] = None,

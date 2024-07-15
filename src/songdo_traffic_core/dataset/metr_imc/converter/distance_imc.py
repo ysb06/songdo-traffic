@@ -18,7 +18,7 @@ class DistancesImc:
         road_data: gpd.GeoDataFrame,  # 표준노드링크 링크 데이터
         turn_info: gpd.GeoDataFrame,  # 회전 제한 정보
         target_ids: List[str],  # 교통량 데이터에 있는 id
-        distance_limit: float = 3000,  # m 단위
+        distance_limit: float = 20000,  # m 단위
     ) -> None:
         self.road_data = road_data.to_crs(epsg=5186)
         self.target_ids = target_ids

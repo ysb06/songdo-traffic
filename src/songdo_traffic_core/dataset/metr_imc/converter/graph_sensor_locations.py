@@ -14,7 +14,9 @@ logger = logging.getLogger(__name__)
 
 GRAPH_SENSOR_LOCATIONS_DIR = "./datasets/metr-imc/"
 GRAPH_SENSOR_LOCATIONS_FILE_NAME = "graph_sensor_locations.csv"
-GRAPH_SENSOR_LOCATIONS_SHAPEFILE_DIR = "./datasets/metr-imc/miscellaneous/graph_sensor_location/"
+GRAPH_SENSOR_LOCATIONS_SHAPEFILE_DIR = (
+    "./datasets/metr-imc/miscellaneous/graph_sensor_location/"
+)
 GRAPH_SENSOR_LOCATIONS_SHAPEFILE_FILE_NAME = "sensor_node.shp"
 
 
@@ -85,7 +87,9 @@ class SensorView:
     def set_filter(self, columns: List[str]) -> None:
         self.column_filter = columns
 
-    def export_to_file(self, folder_path: str, file_name: str = "sensor_nodes.shp") -> None:
+    def export_to_file(
+        self, folder_path: str, file_name: str = "sensor_nodes.shp"
+    ) -> None:
         if self.column_filter is not None:
             result = self.gdf_raw[self.gdf_raw["sensor_id"].isin(self.column_filter)]
         else:
@@ -105,9 +109,18 @@ class SensorNetworkView:
             node_dict, set(self.node_data["NODE_ID"])
         )
 
-    def to_file(self, output_dir: str) -> None:
-        self.node_data.to_file(f"{output_dir}/sensor_nodes.shp", encoding="utf-8")
-        self.link_data.to_file(f"{output_dir}/sensor_links.shp", encoding="utf-8")
+    def to_file(
+        self,
+        output_dir: str,
+        sensor_node_filename: str = "sensor_nodes.shp",
+        sensor_link_file_name: str = "sensor_links.shp",
+    ) -> None:
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir, exist_ok=True)
+        sensor_node_path = os.path.join(output_dir, sensor_node_filename)
+        sensor_link_path = os.path.join(output_dir, sensor_link_file_name)
+        self.node_data.to_file(sensor_node_path, encoding="utf-8")
+        self.link_data.to_file(sensor_link_path, encoding="utf-8")
 
     def __generate_node_data(self, sensor_loc_df: pd.DataFrame) -> gpd.GeoDataFrame:
         data = gpd.GeoDataFrame(
@@ -163,27 +176,29 @@ class SensorNetworkView:
 # 아마도 Distance의 경우 처음 데이터 이후에 추가된 것으로 보임
 
 
-def check_shapefile_arg(value):
-    print("OOOOK:", type(value))
-    if value is None:
-        return "./datasets/metr-imc/miscellaneous/graph_sensor_locations.shp"
-    return value
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Converter for graph_sensor_location")
     parser.add_argument(
         "--sensor_file",
         type=str,
-        default="./datasets/metr-imc/graph_sensor_locations.csv",
+        default="./datasets/metr-imc-296-interpolation-full/graph_sensor_locations.csv",
         help="File path for sensor locations",
     )
     parser.add_argument(
-        "--shapefile",
+        "--distance_file",
+        type=str,
+        default="./datasets/metr-imc-296-interpolation-full/distances_imc_2023.csv",
+        help="File path for sensor locations",
+    )
+    parser.add_argument(
+        "--sensor_network_dir",
         nargs="?",
-        const="./datasets/metr-imc/miscellaneous/graph_sensor_locations.shp",
+        const="./datasets/metr-imc/miscellaneous/metr-imc-296-int-full/",
         help="File path for Shapefile",
     )
     args = parser.parse_args()
-    if args.shapefile is not None:
-        SensorView(args.sensor_file).export_to_file(*os.path.split(args.shapefile))
+
+    if args.sensor_network_dir is not None:
+        SensorNetworkView(args.distance_file, args.sensor_file).to_file(args.sensor_network_dir)
+    else:
+        logger.warning("Nothing to do")
