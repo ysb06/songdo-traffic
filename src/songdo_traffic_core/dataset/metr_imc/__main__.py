@@ -13,12 +13,12 @@ parser = ArgumentParser()
 parser.add_argument(
     "--nodelink_dir",
     help="Path for the node-link folder",
-    default="./datasets/imc_nodelink_2024",
+    default="./datasets/metr-imc/nodelink",
 )
 parser.add_argument(
     "--imcrts_dir",
     help="Path for the IMCRTS folder",
-    default="./datasets/imcrts",
+    default="./datasets/metr-imc/imcrts",
 )
 parser.add_argument(
     "--output_dir",

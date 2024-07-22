@@ -4,7 +4,7 @@ import os
 from .imcrts.collector import IMCRTSCollector
 from .metr_imc.generator import MetrImcDatasetGenerator
 from .nodelink.converter import INCHEON_CODE, NodeLink
-from .utils import download_data, extract_file
+from .utils import download_file, extract_zip_file
 
 logger = logging.getLogger(__name__)
 
@@ -13,10 +13,9 @@ logger = logging.getLogger(__name__)
 NODELINK_DATA_URL = "https://www.its.go.kr/opendata/nodelinkFileSDownload/DF_193/0"
 NODELINK_DIR_PATH = "./datasets/metr-imc/nodelink"
 
-os.makedirs(NODELINK_DIR_PATH, exist_ok=True)
-nodelinke_raw_file_path = download_data(NODELINK_DATA_URL, NODELINK_DIR_PATH)
+nodelinke_raw_file_path = download_file(NODELINK_DATA_URL, NODELINK_DIR_PATH)
 logger.info("Extracting NODE-LINK Data...")
-nodelink_raw_data_path = extract_file(nodelinke_raw_file_path, NODELINK_DIR_PATH)
+nodelink_raw_data_path = extract_zip_file(nodelinke_raw_file_path, NODELINK_DIR_PATH)
 logger.info(f"Extracted at {nodelink_raw_data_path}")
 NodeLink(nodelink_raw_data_path).filter_by_gu_codes(INCHEON_CODE).export(
     NODELINK_DIR_PATH
@@ -27,7 +26,6 @@ NodeLink(nodelink_raw_data_path).filter_by_gu_codes(INCHEON_CODE).export(
 IMCRTS_DIR_PATH = "./datasets/metr-imc/imcrts"
 PDP_KEY = os.environ.get("PDP_KEY")
 
-os.makedirs(IMCRTS_DIR_PATH, exist_ok=True)
 IMCRTSCollector(
     key=PDP_KEY,
     start_date="20230101",

@@ -34,6 +34,7 @@ def install():
         "run",
         "pip",
         "install",
+        "--upgrade",
         "torch==2.2.1",
         "torchvision==0.17.1",
         "torchaudio==2.2.1",

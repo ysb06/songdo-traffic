@@ -10,7 +10,7 @@ from tqdm import tqdm
 logger = logging.getLogger(__name__)
 
 
-def download_data(
+def download_file(
     url: str,
     dir_path: str,
     chunk_size: int = 1024,
@@ -55,7 +55,7 @@ def download_data(
     return file_path
 
 
-def extract_file(file_path: str, dir_path: str) -> str:
+def extract_zip_file(file_path: str, dir_path: str) -> str:
     if not os.path.exists(dir_path):
         os.makedirs(dir_path, exist_ok=True)
 

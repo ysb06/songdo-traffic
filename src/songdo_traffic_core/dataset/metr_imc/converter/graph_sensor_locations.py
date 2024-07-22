@@ -98,6 +98,9 @@ class SensorView:
 
 
 class SensorNetworkView:
+    """
+    생성된 graph_sensor_locations.csv와 distances_imc_2023.csv의 결과를 Shapefile로 다시 저장
+    """
     def __init__(self, distance_csv_path: str, sensor_loc_csv_path: str) -> None:
         self.sensor_distance_df = pd.read_csv(distance_csv_path)
         self.sensor_location_df = pd.read_csv(sensor_loc_csv_path, index_col="index")
@@ -181,19 +184,19 @@ if __name__ == "__main__":
     parser.add_argument(
         "--sensor_file",
         type=str,
-        default="./datasets/metr-imc-296-interpolation-full/graph_sensor_locations.csv",
+        default="./datasets/metr-imc/graph_sensor_locations.csv",
         help="File path for sensor locations",
     )
     parser.add_argument(
         "--distance_file",
         type=str,
-        default="./datasets/metr-imc-296-interpolation-full/distances_imc_2023.csv",
+        default="./datasets/metr-imc/distances_imc_2023.csv",
         help="File path for sensor locations",
     )
     parser.add_argument(
         "--sensor_network_dir",
         nargs="?",
-        const="./datasets/metr-imc/miscellaneous/metr-imc-296-int-full/",
+        const="./datasets/metr-imc/miscellaneous/",
         help="File path for Shapefile",
     )
     args = parser.parse_args()
