@@ -4,10 +4,13 @@
 			"path": "."
 		},
 		{
-			"path": "../../../Library/Application Support/QGIS/QGIS3/profiles/default/python/plugins/songdo_qgis"
+			"path": "songdo_metr"
+		},
+		{
+			"path": "songdo_qgis"
+		},
+		{
+			"path": "songdo_stgcn_wave"
 		}
-	],
-	"settings": {
-		"python.envFile": "${workspaceFolder}/.env"
-	}
+	]
 }

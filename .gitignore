@@ -160,7 +160,7 @@ cython_debug/
 #.idea/
 
 # OS System Files
-.DS_Store
+*.DS_Store*
 
 # Visual Studio Code
 .vscode/settings.json
@@ -168,6 +168,4 @@ cython_debug/
 # Project specific
 datasets/*
 !datasets/*/README*
-outputs/
-wandb/
 
