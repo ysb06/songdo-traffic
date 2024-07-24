@@ -23,7 +23,7 @@ jobs:
         python-version: "3.11"
     - name: Test METR Project
       run: |
-        python3 -m songdo_metr.src
+        python3 -m songdo_metr.src.metr
 #         echo "$HOME/.local/bin" >> $GITHUB_PATH
 #     - name: Install dependencies
 #       run: |
