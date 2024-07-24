@@ -12,18 +12,18 @@ on:
 permissions:
   contents: read
 
-# jobs:
-#   build:
-#     runs-on: ubuntu-latest
-#     steps:
-#     - uses: actions/checkout@v3
-#     - name: Set up Python 3.11
-#       uses: actions/setup-python@v3
-#       with:
-#         python-version: "3.11"
-#     - name: Install Poetry
-#       run: |
-#         curl -sSL https://install.python-poetry.org | python3 -
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v3
+      with:
+        python-version: "3.11"
+    - name: Test METR Project
+      run: |
+        python3 -m songdo_metr.src
 #         echo "$HOME/.local/bin" >> $GITHUB_PATH
 #     - name: Install dependencies
 #       run: |
