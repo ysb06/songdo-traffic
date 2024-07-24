@@ -1,0 +1,47 @@
+[tool.poetry]
+name = "songdo-traffic"
+version = "0.1.0"
+description = ""
+authors = ["Seungbin Yim <ysb06@hotmail.com>"]
+readme = "README.md"
+packages = [{include = "songdo_traffic_core", from = "src"}]
+
+[tool.poetry.dependencies]
+python = "~3.11"
+numpy = "^1.26.4"
+requests = "^2.32.3"
+tables = "^3.9.2"
+geopandas = "^1.0.0"
+tqdm = "^4.66.4"
+seaborn = "^0.13.2"
+ipykernel = "^6.29.4"
+scikit-learn = "^1.5.0"
+openpyxl = "^3.1.5"
+missingno = "^0.5.2"
+omegaconf = "^2.3.0"
+lightning = "^2.3.2"
+wandb = "^0.17.4"
+pydantic = "^2.8.2"
+torch = "2.2.1"
+torchvision = "0.17.1"
+torchaudio = "2.2.1"
+pyqt5 = "^5.15.10"
+
+
+[tool.poetry.group.dev.dependencies]
+flake8 = "^7.1.0"
+autopep8 = "^2.3.1"
+black = {version = "^24.4.2", allow-prereleases = true}
+pyside6 = "^6.7.2"
+
+[tool.poetry.scripts]
+install_libs = "install_libs:install"
+
+[[tool.poetry.source]]
+name = "dgl_repo"
+url = "https://data.dgl.ai/wheels/repo.html"
+priority = "explicit"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
