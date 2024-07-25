@@ -162,7 +162,7 @@ class SongdoQGIS:
         node_connecting_action = SQNodeConnectorAction(self.iface)
         setting_action = SQSettingAction(self.iface)
         self.add_action(**node_connecting_action.action_params)
-        self.add_action(**setting_action.action_params, add_to_toolbar=False)
+        self.add_action(**setting_action.action_params)
 
     def unload(self):
         """Removes the plugin menu item and icon from QGIS GUI."""

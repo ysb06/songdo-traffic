@@ -1,20 +1,24 @@
 {
 	"folders": [
 		{
-			"path": ".",
-			"name": "songdo-traffic (Solution Folder)"
+			"name": "Solution Folder (songdo-traffic)",
+			"path": "."
 		},
 		{
+			"name": "Jupyter Notebooks",
+			"path": "notebooks"
+		},
+		{
+			"name": "songdo_metr",
 			"path": "songdo_metr"
 		},
 		{
+			"name": "songdo_qgis",
 			"path": "songdo_qgis"
 		},
 		{
+			"name": "songdo_stgcn_wave",
 			"path": "songdo_stgcn_wave"
-		},
-		{
-			"path": "pypm-vscode"
 		}
 	]
 }

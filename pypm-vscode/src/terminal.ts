@@ -5,6 +5,12 @@ import { getExtensionSetting } from "./settings";
 
 export async function onTerminalCreated(terminal: vscode.Terminal): Promise<void> {
   const terminalOptions: vscode.TerminalOptions = terminal.creationOptions;
+  // terminal.sendText('export PS1="Test: "');
+  console.log(terminalOptions);
+}
+
+export async function onTerminalCreatedLegacy(terminal: vscode.Terminal): Promise<void> {
+  const terminalOptions: vscode.TerminalOptions = terminal.creationOptions;
   console.log(terminalOptions);
 
   if (terminalOptions.hideFromUser) {
