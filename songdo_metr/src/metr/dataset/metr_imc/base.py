@@ -29,14 +29,18 @@ class MetrBase:
 
 
 class DataPath:
-    def __init__(self, directory: str, filename: str) -> None:
+    def __init__(
+        self, directory: str, filename: str, makedir: bool = True, dir_exist_ok=True
+    ) -> None:
         self.directory = directory
         self.filename = filename
+        if makedir:
+            os.makedirs(directory, exist_ok=dir_exist_ok)
 
     @property
     def exists(self) -> bool:
         return os.path.exists(self)
-    
+
     @property
     def tuple(self) -> Tuple[str, str]:
         return self.directory, self.filename
@@ -46,7 +50,7 @@ class DataPath:
 
     def __repr__(self) -> str:
         return os.path.join(self.directory, self.filename)
-    
+
     def __fspath__(self) -> str:
         return os.path.join(self.directory, self.filename)
 
@@ -65,7 +69,6 @@ class Metr:
         self.dist_path: DataPath = DataPath(target_root_dir, distances_filename)
         self.admx_path: DataPath = DataPath(target_root_dir, adj_mx_filename)
 
-        print("OK")
         data = None
         if self.tdat_path.exists:
             data = pd.read_hdf(self.tdat_path)
@@ -140,11 +143,16 @@ class Metr:
         logger.info(f"Adjacency Matrix --> {self.raw_base.adj_mx.data[2].shape}")
 
     def export_data(self, overwrite: bool = False, skip_exist: bool = True) -> None:
-        def save_file(data_path: DataPath, save_method: Callable[[str, str], None]) -> None:
+        logger.info(f"Export all 4 data to {self.tdat_path.directory}")
+        def save_file(
+            data_path: DataPath, save_method: Callable[[str, str], None]
+        ) -> None:
             if overwrite or not os.path.exists(data_path):
                 save_method(*data_path.tuple)
             elif not skip_exist:
-                raise Exception(f"{data_path} already exists. Set overwrite to True to overwrite it.")
+                raise Exception(
+                    f"{data_path} already exists. Set overwrite to True to overwrite it."
+                )
             else:
                 logger.info(f"{data_path} already exists. Skipping...")
 
@@ -160,10 +168,3 @@ class Metr:
 
         for data_path, save_method in files_methods.items():
             save_file(data_path, save_method)
-
-        
-
-
-class MetrDataset:
-    def __init__(self) -> None:
-        pass

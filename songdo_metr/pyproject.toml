@@ -6,16 +6,16 @@ authors = [
     {name = "Seungbin Yim", email = "ysb06@hotmail.com"},
 ]
 dependencies = [
-    "torch>=2.3.1",
-    "torchvision>=0.18.1",
-    "torchaudio>=2.3.1",
+    "torch~=2.2.1",
+    "torchvision~=0.17.1",
+    "torchaudio~=2.2.1",
     "scikit-learn>=1.5.1",
     "openpyxl>=3.1.5",
     "requests>=2.32.3",
     "geopandas>=1.0.1",
     "tqdm>=4.66.4",
     "tables>=3.9.2",
-    "numpy==1.26.4",
+    "numpy~=1.26.4",
 ]
 requires-python = "==3.11.*"
 readme = "README.md"
