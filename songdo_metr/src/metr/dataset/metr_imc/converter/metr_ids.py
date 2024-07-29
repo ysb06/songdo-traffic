@@ -9,6 +9,10 @@ logger = logging.getLogger(__name__)
 class MetrIds:
     def __init__(self, raw: Optional[List[str]] = None) -> None:
         self.ids: List[str] = raw if raw else []
+    
+    @property
+    def data_exists(self) -> bool:
+        return len(self.ids) > 0
 
     def import_from_traffic_data(self, traffic_data: pd.DataFrame) -> None:
         self.ids = traffic_data.columns.tolist()

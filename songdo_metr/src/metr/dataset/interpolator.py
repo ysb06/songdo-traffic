@@ -6,12 +6,12 @@ import pandas as pd
 from tqdm import tqdm
 
 
-class InterpolatorBase:
+class Interpolator:
     def interpolate(self, df: pd.DataFrame) -> pd.DataFrame:
         raise NotImplementedError
 
 
-class IterativeRandomForestInterpolator(InterpolatorBase):
+class IterativeRandomForestInterpolator(Interpolator):
     def __init__(
         self,
         random_state: Union[int, Tuple[int, int]] = 42,
@@ -41,12 +41,12 @@ class IterativeRandomForestInterpolator(InterpolatorBase):
         return pd.DataFrame(fitted_data, columns=df.columns, index=df.index)
 
 
-class LinearInterpolator(InterpolatorBase):
+class LinearInterpolator(Interpolator):
     def interpolate(self, df: pd.DataFrame) -> pd.DataFrame:
         return df.interpolate(method="linear", axis=0, limit_direction="both")
 
 
-class SplineInterpolator(InterpolatorBase):
+class SplineInterpolator(Interpolator):
     def interpolate(self, df: pd.DataFrame, need_round: bool = True) -> pd.DataFrame:
         df = df.interpolate(method="spline", order=3, axis=0)
         if need_round:
@@ -54,43 +54,56 @@ class SplineInterpolator(InterpolatorBase):
         else:
             return df
 
+
 class SmartSplineInterpolator(SplineInterpolator):
     def interpolate(self, df: pd.DataFrame) -> pd.DataFrame:
         tqdm.pandas()
         df = super().interpolate(df)
         return df.apply(self.__fill_na_with_same_time, axis=1)
-        
+
     def __fill_na_with_same_time(self, s: pd.Series) -> pd.Series:
         s_filled = s.copy()
         for hour in range(24):
             hourly_data = s[s.index.hour == hour]
             mean_value = hourly_data.mean(skipna=True)
-            s_filled.loc[s_filled.index.hour == hour] = s_filled.loc[s_filled.index.hour == hour].fillna(mean_value)
+            s_filled.loc[s_filled.index.hour == hour] = s_filled.loc[
+                s_filled.index.hour == hour
+            ].fillna(mean_value)
         return s_filled
 
-class TotalMeanFillInterpolator(InterpolatorBase):
+
+class TotalMeanFillInterpolator(Interpolator):
     def interpolate(self, df: pd.DataFrame) -> pd.DataFrame:
         return df.fillna(df.mean())
 
 
-class ColumnMeanFillInterpolator(InterpolatorBase):
+class ColumnMeanFillInterpolator(Interpolator):
     def __fill_column_mean(self, column: pd.Series):
         return column.fillna(column.mean())
 
     def interpolate(self, df: pd.DataFrame) -> pd.DataFrame:
         return df.apply(self.__fill_column_mean, axis=1)
 
-class TimeMeanFillInterpolator(InterpolatorBase):
+
+# 이것 외 다른 Interpolator는 수정해도 무방
+
+
+class TimeMeanFillInterpolator(Interpolator):
+    "한 열의 결측치를 한 열 내 같은 시간대의 평균으로 채우는 Interpolator"
+
     def __fill_na_with_same_time(self, s: pd.Series) -> pd.Series:
         s_filled = s.copy()
         for hour in range(24):
             hourly_data = s[s.index.hour == hour]
             mean_value = hourly_data.mean(skipna=True)
-            s_filled.loc[s_filled.index.hour == hour] = s_filled.loc[s_filled.index.hour == hour].fillna(mean_value)
+            s_filled.loc[s_filled.index.hour == hour] = s_filled.loc[
+                s_filled.index.hour == hour
+            ].fillna(mean_value)
         return s_filled
 
     def interpolate(self, df: pd.DataFrame) -> pd.DataFrame:
         return df.apply(self.__fill_na_with_same_time, axis=0).round().astype(int)
+
 
 if __name__ == "__main__":
     pass

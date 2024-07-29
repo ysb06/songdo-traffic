@@ -7,30 +7,27 @@ from datetime import datetime, timedelta
 import logging
 import os
 
+from metr.dataset.interpolator import Interpolator
+
 logger = logging.getLogger(__name__)
 
 
 class MetrImcTrafficData:
     """metr-imc.h5"""
 
-    def __init__(
-        self, data: Optional[pd.DataFrame] = None, file_path: Optional[str] = None
-    ) -> None:
-        self.raw = None
-        if data is not None and file_path is not None:
-            if not pd.read_hdf(file_path).equals(data):
-                Exception("Data and file are not equal")
-        elif data is not None:
-            self.raw = data
-        elif file_path is not None:
-            self.raw = pd.read_hdf(file_path, dtype=np.float32)
+    def __init__(self, data: Optional[pd.DataFrame] = None) -> None:
+        self.raw = data
+        self.data = self.raw.copy() if self.raw is not None else None
 
-        self.data = self.raw.copy()
+    @property
+    def data_exists(self) -> bool:
+        return self.data is not None
 
     def import_from_imcrts(self, data_path: str):
         traffic_data_raw = pd.read_pickle(data_path)
         converted_dict = self.__convert_raw_data(traffic_data_raw)
         self.raw = pd.DataFrame(converted_dict, dtype=np.float64)
+        self.data = self.raw.copy()
 
     def __convert_raw_data(self, raw_traffic_data: pd.DataFrame):
         temp = {road_id: {} for road_id in raw_traffic_data["linkID"].unique()}
@@ -62,7 +59,7 @@ class MetrImcTrafficData:
         end_date: Optional[datetime] = None,
     ):
         if idx_list is not None:
-            self.data = self.data.iloc[idx_list]
+            self.data = self.data.loc[idx_list]
         else:
             if start_date is not None and end_date is not None:
                 self.data = self.data.loc[start_date:end_date]
@@ -70,6 +67,11 @@ class MetrImcTrafficData:
                 self.data = self.data.loc[start_date:]
             elif end_date is not None:
                 self.data = self.data.loc[:end_date]
+
+    def interpolate(self, interpolator: Interpolator) -> pd.DataFrame:
+        logger.info("Interpolating METR-IMC data...")
+        self.data = interpolator.interpolate(self.data)
+        logger.info("Interplating Complete")
 
     def to_hdf(self, dir_path: str, filename: str = "metr-imc.h5") -> None:
         logger.info(f"Saving METR-IMC data to {os.path.join(dir_path, filename)}...")

@@ -13,10 +13,10 @@ import torch.nn as nn
 import wandb
 from sklearn.preprocessing import StandardScaler
 
-from songdo_stgcn_wave.load_data import *
-from songdo_stgcn_wave.model import *
-from songdo_stgcn_wave.sensors2graph import *
-from songdo_stgcn_wave.utils import *
+from load_data import *
+from model import *
+from sensors2graph import *
+from utils import *
 
 parser = argparse.ArgumentParser(description="STGCN_WAVE")
 parser.add_argument("--lr", default=0.001, type=float, help="learning rate")

@@ -1,5 +1,5 @@
 import os
-from typing import List
+from typing import Dict, List, Optional, Tuple
 import pandas as pd
 import numpy as np
 import logging
@@ -7,6 +7,46 @@ import pickle
 from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
+
+
+class AdjacencyMatrixData:
+    def __init__(
+        self, data: Optional[Tuple[List[str], Dict[str, str], np.ndarray]] = None
+    ) -> None:
+        self.data = data
+    
+    @property
+    def sensor_ids(self) -> List[str]:
+        return self.data[0]
+    
+    @property
+    def sensor_id_to_idx(self) -> Dict[str, str]:
+        return self.data[1]
+    
+    @property
+    def adj_mx(self) -> np.ndarray:
+        return self.data[2]
+    
+    @property
+    def data_exists(self) -> bool:
+        return self.data is not None
+    
+    def read_pkl(self, file_path: str) -> None:
+        with open(file_path, "rb") as f:
+            self.data = pickle.load(f)
+    
+    def generate_adj_mx(self, distances: pd.DataFrame, sensor_ids: List[str]) -> None:
+        temp = AdjacencyMatrix(distances, sensor_ids)
+        self.data = []
+        self.data.append(temp.sensor_ids)
+        self.data.append(temp.sendsor_id_to_idx)
+        self.data.append(temp.adj_mx)
+    
+    def to_pickle(self, dir_path: str, filename: str = "adj_mx.pkl") -> None:
+        logger.info(f"Saving adjacency matrix data to {os.path.join(dir_path, filename)}...")
+        with open(os.path.join(dir_path, filename), "wb") as f:
+            pickle.dump(self.data, f)
+        logger.info("Complete")
 
 
 class AdjacencyMatrix:
@@ -19,7 +59,9 @@ class AdjacencyMatrix:
     ) -> None:
         self.distance_df = distances
         self.sensor_ids = sensor_ids
-        self.adj_mx, self.sendsor_id_to_idx = self.__get_adjacency_matrix(self.distance_df, self.sensor_ids)
+        self.adj_mx, self.sendsor_id_to_idx = self.__get_adjacency_matrix(
+            self.distance_df, self.sensor_ids
+        )
 
     def to_pickle(self, dir_path: str, filename: str = "adj_mx.pkl") -> None:
         packs = []

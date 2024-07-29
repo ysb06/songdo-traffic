@@ -1,5 +1,5 @@
 import os
-from typing import List
+from typing import List, Optional
 import geopandas as gpd
 import pandas as pd
 from tqdm import tqdm
@@ -8,6 +8,40 @@ import logging
 from shapely.geometry import LineString
 
 logger = logging.getLogger(__name__)
+
+
+class DistancesData:
+    def __init__(self, data: Optional[pd.DataFrame] = None) -> None:
+        self.data = data
+
+        self.std_road: Optional[gpd.GeoDataFrame] = None
+        self.std_turn: Optional[gpd.GeoDataFrame] = None
+        self.G: Optional[nx.DiGraph] = None
+    
+    @property
+    def data_exists(self) -> bool:
+        return self.data is not None
+
+    def generate_graph(
+        self,
+        road_data: gpd.GeoDataFrame,  # 표준노드링크 링크 데이터
+        turn_info: gpd.GeoDataFrame,  # 회전 제한 정보
+        target_ids: List[str],  # 교통량 데이터에 있는 id
+        distance_limit: float = 9000,
+    ) -> None:
+        self.std_road = road_data
+        self.std_turn = turn_info
+
+        data = DistancesImc(self.std_road, self.std_turn, target_ids, distance_limit)
+
+        self.G = data.G
+        self.data = data.distances
+    
+    def to_csv(self, dir_path: str, filename: str = "distances_imc_2023.csv") -> None:
+        logger.info(f"Saving distance data to {os.path.join(dir_path, filename)}...")
+        file_path = os.path.join(dir_path, filename)
+        self.data.to_csv(file_path, index=False)
+        logger.info("Complete")
 
 
 class DistancesImc:

@@ -5,7 +5,7 @@ from typing import Any, List, Optional, Tuple
 import geopandas as gpd
 import pandas as pd
 
-from metr.dataset.interpolator import InterpolatorBase
+from metr.dataset.interpolator import Interpolator
 
 from .base import MetrImc
 from .converter.adj_mx import AdjacencyMatrix
@@ -137,7 +137,7 @@ class MetrImcSubsetGenerator:
     def process_metr_imc(
         self,
         targets: Optional[List[str]] = None,
-        interpolate_filter: Optional[InterpolatorBase] = None,
+        interpolate_filter: Optional[Interpolator] = None,
     ) -> Tuple[pd.DataFrame, List[str]]:
         if self.metr_imc_df is None:
             raise FileNotFoundError(f"{self.metr_imc_path} not found.")
@@ -159,7 +159,7 @@ class MetrImcSubsetGenerator:
         self,
         targets: Optional[List[str]] = None,
         output_dir: str = "./",
-        interpolate_filter: Optional[InterpolatorBase] = None,
+        interpolate_filter: Optional[Interpolator] = None,
     ) -> None:
         logger.info(f"Start generating subset...")
         os.makedirs(output_dir, exist_ok=True)
