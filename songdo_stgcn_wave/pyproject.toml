@@ -25,6 +25,14 @@ requires-python = "==3.11.*"
 readme = "README.md"
 license = {text = "Apache-2.0"}
 
+[project.optional-dependencies]
+cuda = [
+    "torch==2.3.0+cu121",
+    "torchvision==0.18.0+cu121",
+    "torchaudio==2.3.0+cu121",
+    "dgl==2.2.1+cu121",
+]
+
 [project.scripts]
 import-model = "install:copy_model"
 
@@ -36,6 +44,16 @@ distribution = false
 name = "dgl"
 url = "https://data.dgl.ai/wheels/repo.html"
 type = "find_links"
+
+[[tool.pdm.source]]
+name = "dgl_cuda"
+url = "https://data.dgl.ai/wheels/cu121/repo.html"
+type = "find_links"
+
+[[tool.pdm.source]]
+name = "torch_cuda"
+url = "https://download.pytorch.org/whl/cu121"
+type = "index"
 
 
 [tool.pdm.scripts]

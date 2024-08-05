@@ -55,6 +55,8 @@ def train(config: Config):
     epochs = config.epochs
     lr = config.lr
 
+    os.makedirs(os.path.split(save_path)[0], exist_ok=True)
+
     len_val = round(num_samples * 0.1)
     len_train = round(num_samples * 0.7)
     train = df[:len_train]
