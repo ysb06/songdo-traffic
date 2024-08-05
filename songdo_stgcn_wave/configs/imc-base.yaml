@@ -5,9 +5,9 @@ epochs: 50
 num_layers: 9
 window: 144
 dataset_name: METR-IMC
-sensorsfilepath: ./datasets/metr-imc/metr_ids.txt
-disfilepath: ./datasets/metr-imc/distances_imc_2023.csv
-tsfilepath: ./datasets/metr-imc/metr-imc.h5
+sensorsfilepath: ../datasets/metr-imc/metr_ids.txt
+disfilepath: ../datasets/metr-imc/distances_imc_2023.csv
+tsfilepath: ../datasets/metr-imc/metr-imc.h5
 savemodelpath: output/stgcnwavemodel.pt
 pred_len: 5
 control_str: TNTSTNTST

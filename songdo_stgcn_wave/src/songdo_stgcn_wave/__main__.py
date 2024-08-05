@@ -7,7 +7,7 @@ import yaml
 from dataclasses import dataclass
 
 from .training import train
-from .utils import Config
+from .utils import Config, get_config
 
 
 parser = argparse.ArgumentParser(description="STGCN_WAVE")
@@ -37,11 +37,8 @@ parser.add_argument("--seed", type=int, help="seed for training")
 args = parser.parse_args()
 
 config_path = os.path.join("configs", f"{args.config}.yaml")
-print("Config:", config_path)
-with open(config_path, "r") as f:
-    config_raw = yaml.load(f, Loader=yaml.FullLoader)
+config = get_config(config_path)
 
-config = Config(**config_raw)
 config.lr = args.lr if args.lr is not None else config.lr
 config.disablecuda = (
     args.disablecuda if args.disablecuda is not None else config.disablecuda
@@ -75,6 +72,4 @@ config.seed = args.seed if args.seed is not None else config.seed
 
 print(config)
 
-
-def run():
-    train(config)
+train(config)

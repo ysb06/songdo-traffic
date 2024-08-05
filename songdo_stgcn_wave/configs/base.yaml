@@ -5,9 +5,9 @@ epochs: 50
 num_layers: 9
 window: 144
 dataset_name: METR-LA
-sensorsfilepath: ./datasets/METRLA/metr_ids.txt
-disfilepath: ./datasets/METRLA/distances_la_2012.csv
-tsfilepath: ./datasets/METRLA/metr-la.h5
+sensorsfilepath: ../datasets/METRLA/metr_ids.txt
+disfilepath: ../datasets/METRLA/distances_la_2012.csv
+tsfilepath: ../datasets/METRLA/metr-la.h5
 savemodelpath: output/stgcnwavemodel.pt
 pred_len: 5
 control_str: TNTSTNTST

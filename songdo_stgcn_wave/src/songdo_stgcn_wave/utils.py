@@ -4,6 +4,7 @@ import os
 import random
 from datetime import datetime
 from dataclasses import dataclass
+import yaml
 
 @dataclass
 class Config:
@@ -30,3 +31,9 @@ def get_auto_device() -> torch.device:
         device = torch.device("cpu")
 
     return device
+
+def get_config(config_path: str) -> Config:
+    with open(config_path, "r") as f:
+        config_raw = yaml.load(f, Loader=yaml.FullLoader)
+
+    return Config(**config_raw)
