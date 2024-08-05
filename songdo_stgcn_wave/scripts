@@ -1,3 +1,0 @@
--- Model for subset-268
-
-python main.py --sensorsfilepath ../datasets/metr-imc/subsets/metr-imc-268/metr_ids.txt --disfilepath ../datasets/metr-imc/subsets/metr-imc-268/distances_imc_2023.csv --tsfilepath ../datasets/metr-imc/subsets/metr-imc-268/metr-imc.h5 --savemodelpath stgcnwave_268.pt
