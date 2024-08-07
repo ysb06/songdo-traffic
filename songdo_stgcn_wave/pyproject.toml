@@ -2,9 +2,7 @@
 name = "songdo_stgcn_wave"
 version = "0.1.1"
 description = "Default template for PDM package"
-authors = [
-    {name = "Seungbin Yim", email = "ysb06@hotmail.com"},
-]
+authors = [{ name = "Seungbin Yim", email = "ysb06@hotmail.com" }]
 dependencies = [
     "pyyaml>=6.0.1",
     "numpy<2",
@@ -12,20 +10,21 @@ dependencies = [
     "pandas>=2.2.2",
     "scipy>=1.14.0",
     "scikit-learn>=1.5.1",
-    "torch<=2.3.0",
-    "torchvision<=0.18.0",
-    "torchaudio<=2.3.0",
-    "dgl>=2.2.1",
     "setuptools==58.3.0",
     "pydantic>=2.8.2",
     "tables>=3.9.2",
 ]
-
 requires-python = "==3.11.*"
 readme = "README.md"
-license = {text = "Apache-2.0"}
+license = { text = "Apache-2.0" }
 
 [project.optional-dependencies]
+standard = [
+    "torch==2.3.0",
+    "torchvision==0.18.0",
+    "torchaudio==2.3.0",
+    "dgl==2.2.1",
+]
 cuda = [
     "torch==2.3.0+cu121",
     "torchvision==0.18.0+cu121",
@@ -35,7 +34,6 @@ cuda = [
 
 [project.scripts]
 import-model = "install:copy_model"
-
 
 [tool.pdm]
 distribution = false
@@ -55,8 +53,7 @@ name = "torch_cuda"
 url = "https://download.pytorch.org/whl/cu121"
 type = "index"
 
-
 [tool.pdm.scripts]
 _.env = { PYTHONPATH = "./src" }
-import-model = {call = "install:copy_model"}
-training = {call = "songdo_stgcn_wave.__main__:run"}
+import-model = { call = "install:copy_model" }
+training = { call = "songdo_stgcn_wave.__main__:run" }
