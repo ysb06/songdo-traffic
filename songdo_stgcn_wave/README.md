@@ -1,6 +1,10 @@
 # songdo_stgcn_wave
 
-## Get Started
+이 프로젝트는 STGCN WAVE 모델을 기반으로 인천시 교통량 예측 모델을 생성하는 것이 목표로 이를 위한 다양한 코드를 포함하고 있습니다.
+
+This project aims to create a traffic volume prediction model for Incheon City based on the STGCN WAVE model and includes various codes for this purpose.
+
+## Get Started for training model
 
 ### Installing Requirements
 
