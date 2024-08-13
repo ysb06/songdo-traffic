@@ -6,10 +6,10 @@
 	"version": "0.2.0",
 	"configurations": [
 		{
-			"name": "Run Project (Songdo METR)",
+			"name": "Generate Dataset (Songdo METR)",
 			"type": "debugpy",
 			"request": "launch",
-			"module": "metr",
+			"module": "metr.dataset",
 			"console": "integratedTerminal"
 		},
 		{

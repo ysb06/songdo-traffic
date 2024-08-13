@@ -8,6 +8,12 @@ This project aims to create a traffic volume prediction model for Incheon City b
 
 ### Installing Requirements
 
+First, you need to update dgl submodule.
+
+``` bash
+git submodule update
+```
+
 #### Using PDM
 
 ```bash

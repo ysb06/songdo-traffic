@@ -95,7 +95,7 @@ class MetrImc:
     ) -> None:
         road_ids = list(set(road_data["LINK_ID"]) & set(traffic_data["linkID"]))
 
-        logger.info("Converting traffic data to METR-IMC format...")
+        logger.info("Converting traffic data to METR format...")
         converted_dict, missing_links = self.__convert_raw_data(traffic_data, road_ids)
         # Todo: converted_dict가 제대로 변환되었는지 확인 필요
         # 정상적이라면 missing_links는 빈 리스트가 되어야 함, 이미 road_ids에서 처리를 했으므로...
@@ -166,11 +166,11 @@ class MetrImc:
         )
 
     def to_hdf(self, dir_path: str, filename: str = "metr-imc.h5") -> None:
-        logger.info(f"Saving METR-IMC data to {os.path.join(dir_path, filename)}...")
+        logger.info(f"Saving METR data to {os.path.join(dir_path, filename)}...")
         self.data.to_hdf(os.path.join(dir_path, filename), key="data")
         logger.info("Complete")
 
     def to_excel(self, dir_path: str, filename: str = "metr-imc.xlsx") -> None:
-        logger.info(f"Saving METR-IMC data to {os.path.join(dir_path, filename)}...")
+        logger.info(f"Saving METR data to {os.path.join(dir_path, filename)}...")
         self.data.to_excel(os.path.join(dir_path, filename))
         logger.info("Complete")

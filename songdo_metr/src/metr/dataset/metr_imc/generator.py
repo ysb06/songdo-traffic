@@ -7,7 +7,7 @@ import pandas as pd
 
 from metr.dataset.interpolator import Interpolator
 
-from .base import MetrImc
+from .converter.metr_imc import MetrImc
 from .converter.adj_mx import AdjacencyMatrix
 from .converter.distance_imc import DistancesImc
 from .converter.graph_sensor_locations import GraphSensorLocations
@@ -22,8 +22,8 @@ class MetrImcDatasetGenerator:
             os.path.join(nodelink_dir, "imc_node.shp")
         )
         self.road_gdf = gpd.read_file(os.path.join(nodelink_dir, "imc_link.shp"))
-        self.turninfo_gdf = gpd.read_file(
-            os.path.join(nodelink_dir, "imc_turninfo.shp")
+        self.turninfo_gdf: pd.DataFrame = gpd.read_file(
+            os.path.join(nodelink_dir, "imc_turninfo.dbf")
         )
 
         self.traffic_df = pd.read_pickle(os.path.join(imcrts_dir, "imcrts_data.pkl"))

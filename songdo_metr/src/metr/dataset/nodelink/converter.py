@@ -17,7 +17,7 @@ class NodeLinkData:
         self,
         node_data: gpd.GeoDataFrame,
         link_data: gpd.GeoDataFrame,
-        turn_data: gpd.GeoDataFrame,
+        turn_data: pd.DataFrame,
     ) -> None:
         self.node_data = node_data
         self.link_data = link_data
@@ -44,7 +44,8 @@ class NodeLinkData:
         self.link_data.to_file(
             os.path.join(output_dir, "imc_link.shp"), encoding="utf-8"
         )
-        self.turn_data.to_file(
+        turn_data = gpd.GeoDataFrame(self.turn_data)
+        turn_data.to_file(
             os.path.join(output_dir, "imc_turninfo.dbf"), encoding="utf-8"
         )
         logger.info("Exporting completed.")
@@ -64,10 +65,13 @@ class NodeLink(NodeLinkData):
 
         logger.info("Loading node data...")
         node_data: gpd.GeoDataFrame = gpd.read_file(self.node_path, encoding=encoding)
+        logger.info(f"Done: {type(node_data)}")
         logger.info("Loading link data...")
         link_data: gpd.GeoDataFrame = gpd.read_file(self.link_path, encoding=encoding)
+        logger.info(f"Done: {type(link_data)}")
         logger.info("Loading turning data...")
-        turn_data: gpd.GeoDataFrame = gpd.read_file(self.turn_path, encoding=encoding)
+        turn_data: pd.DataFrame = gpd.read_file(self.turn_path, encoding=encoding)
+        logger.info(f"Done: {type(turn_data)}")
 
         super().__init__(node_data, link_data, turn_data)
 

@@ -50,7 +50,7 @@ class DistancesImc:
     def __init__(
         self,
         road_data: gpd.GeoDataFrame,  # 표준노드링크 링크 데이터
-        turn_info: gpd.GeoDataFrame,  # 회전 제한 정보
+        turn_info: pd.DataFrame,  # 회전 제한 정보
         target_ids: List[str],  # 교통량 데이터에 있는 id
         distance_limit: float = 9000,  # m 단위
     ) -> None:
@@ -80,7 +80,7 @@ class DistancesImc:
         return pd.DataFrame(result)
 
     def __apply_turn_restrictions(
-        self, G: nx.DiGraph, turn_info: gpd.GeoDataFrame
+        self, G: nx.DiGraph, turn_info: pd.DataFrame
     ) -> nx.DiGraph:
         for _, row in tqdm(
             turn_info.iterrows(),

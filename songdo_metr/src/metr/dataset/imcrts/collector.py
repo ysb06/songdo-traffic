@@ -47,7 +47,7 @@ class IMCRTSCollector:
         self,
         key: str,
         start_date: str = "20230101",
-        end_date: str = "20231231",
+        end_date: str = "20231231", # Include the end date
     ) -> None:
         logger.info("Collecting...")
         self.params = {
