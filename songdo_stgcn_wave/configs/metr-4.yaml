@@ -1,0 +1,21 @@
+lr: 0.001
+disablecuda: false
+batch_size: 50
+epochs: 50
+num_layers: 9
+window: 144
+dataset_name: METR-IMC
+sensorsfilepath: ../datasets/metr-imc/subsets/metr-4-combined/metr_ids.txt
+disfilepath: ../datasets/metr-imc/subsets/metr-4-combined/distances_imc_2023.csv
+tsfilepath: ../datasets/metr-imc/subsets/metr-4-combined/metr-imc.h5
+savemodelpath: output/stgcnwavemodel_4.pt
+pred_len: 5
+control_str: TNTSTNTST
+channels:
+  - 1
+  - 16
+  - 32
+  - 64
+  - 32
+  - 128
+seed: 42
