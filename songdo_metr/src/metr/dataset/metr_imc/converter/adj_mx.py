@@ -87,7 +87,7 @@ class AdjacencyMatrix:
             sensor_id_to_index[sensor_id] = i
         # Fills cells in the matrix with distances.
         for row in tqdm(
-            distance_df.values, total=len(distance_df), desc="Filling matrix"
+            distance_df.values, total=len(distance_df), desc="Filling Matrix"
         ):
             if row[0] not in sensor_id_to_index or row[1] not in sensor_id_to_index:
                 continue

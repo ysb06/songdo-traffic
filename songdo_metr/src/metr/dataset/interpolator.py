@@ -96,13 +96,28 @@ class TimeMeanFillInterpolator(Interpolator):
         for hour in range(24):
             hourly_data = s[s.index.hour == hour]
             mean_value = hourly_data.mean(skipna=True)
+            if pd.isna(mean_value):
+                print("Problem in [", s.name, "] in time[", hour, "]")
             s_filled.loc[s_filled.index.hour == hour] = s_filled.loc[
                 s_filled.index.hour == hour
             ].fillna(mean_value)
+
         return s_filled
 
     def interpolate(self, df: pd.DataFrame) -> pd.DataFrame:
-        return df.apply(self.__fill_na_with_same_time, axis=0).round().astype(int)
+        result = df.apply(self.__fill_na_with_same_time, axis=0)
+        result = result.round()
+
+        nan_locations = result.isna()
+        if nan_locations.any().any():
+            print("Warning: One or more columns contain only missing values. Please check your data and remove empty columns before proceeding.")
+            # 결측치가 포함된 열 이름 출력
+            nan_columns = nan_locations.any()
+            columns_with_nan = nan_columns[nan_columns].index.tolist()
+            print("Columns with missing values:\r\n", columns_with_nan)
+
+        result = result.astype(int)
+        return result
 
 
 if __name__ == "__main__":

@@ -123,7 +123,10 @@ class MetrImcSubsetGenerator:
         self.distances_imc_path = os.path.join(metr_imc_dir, distances_imc_filename)
         self.distances_imc: Optional[pd.DataFrame] = None
         if os.path.exists(self.distances_imc_path):
-            self.distances_imc = pd.read_csv(self.distances_imc_path)
+            self.distances_imc = pd.read_csv(
+                self.distances_imc_path,
+                dtype={"from": "str", "to": "str", "distance": "float"},
+            )
         else:
             logger.warning(f"{self.distances_imc_path} not found.")
 
@@ -152,6 +155,7 @@ class MetrImcSubsetGenerator:
         if interpolate_filter is not None:
             logger.info(f"Interpolating...")
             metr_imc = interpolate_filter.interpolate(metr_imc)
+            logger.info(f"Interpolating Finished!")
 
         return metr_imc, targets
 
@@ -167,7 +171,9 @@ class MetrImcSubsetGenerator:
         # 새 데이터 생성
         # METR-IMC
         metr_imc_path = os.path.join(output_dir, os.path.split(self.metr_imc_path)[1])
-        logger.info(f"Generating {metr_imc_path}...")
+        logger.info(
+            f"Generating {metr_imc_path} with {self.metr_imc_df.shape} [Length: {len(targets)}]..."
+        )
         metr_imc, targets = self.process_metr_imc(targets, interpolate_filter)
         metr_imc.to_hdf(metr_imc_path, key="data")
 
