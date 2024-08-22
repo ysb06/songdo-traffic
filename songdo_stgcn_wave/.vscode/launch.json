@@ -11,7 +11,7 @@
 			"request": "launch",
 			"module": "songdo_stgcn_wave",
 			"console": "integratedTerminal",
-			"args": ["--config", "imc-subset-268-base"],
+			"args": ["--config", "metr-1"],
 			"env": {
 				"PYTHONPATH": "./src"
 			}

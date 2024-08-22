@@ -12,19 +12,45 @@ import pandas as pd
 import scipy.sparse as sp
 import torch
 import torch.nn as nn
-import wandb
 from sklearn.preprocessing import StandardScaler
 from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 
-from .utils import Config, get_auto_device
-from stgcn_wave.sensors2graph import get_adjacency_matrix
-from stgcn_wave.model import STGCN_WAVE
+import wandb
 from stgcn_wave.load_data import data_transform
-from stgcn_wave.utils import evaluate_model, evaluate_metric
+from stgcn_wave.model import STGCN_WAVE
+from stgcn_wave.sensors2graph import get_adjacency_matrix
+from stgcn_wave.utils import evaluate_metric, evaluate_model
+from wandb import Config
+
+from .utils import HyperParams, get_auto_device
+from metr.components.adj_mx import import_adj_mx
 
 
-def train(config: Config):
+def train_new(config: HyperParams):
+    run_name = (
+        f"{config.dataset_name}_STGCN_WAVE_{datetime.now().strftime('%y%m%d_%H%M%S')}"
+    )
+    training_divice = get_auto_device()
+
+    # wandb.init(project='METR-IMC', name=run_name, config=asdict(config))
+    # wandb_config: Config = wandb.config
+    # wandb_config.update({"device": str(training_divice)})
+
+    print(f"Starting run {run_name}")
+    with open(config.sensorsfilepath) as f:
+        sensor_ids = f.read().strip().split(",")
+    distance_df = pd.read_csv(config.disfilepath, dtype={"from": "str", "to": "str"})
+
+    sensor_id_to_ind = {}
+    for i, sensor_id in enumerate(sensor_ids):
+        sensor_id_to_ind[sensor_id] = i
+
+    adj_mx = get_adjacency_matrix(distance_df, sensor_ids)
+    adj_mx_2 = import_adj_mx(config.adj_mx_filepath)
+
+
+def train(config: HyperParams):
     run_name = (
         f"{config.dataset_name}_STGCN_WAVE_{datetime.now().strftime('%y%m%d_%H%M%S')}"
     )

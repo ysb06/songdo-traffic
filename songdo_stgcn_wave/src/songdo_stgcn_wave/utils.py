@@ -1,3 +1,4 @@
+from typing import Optional
 import torch
 import gc
 import os
@@ -7,7 +8,7 @@ from dataclasses import dataclass
 import yaml
 
 @dataclass
-class Config:
+class HyperParams:
     lr: float
     disablecuda: bool
     batch_size: int
@@ -23,6 +24,8 @@ class Config:
     control_str: str
     channels: list
     seed: int
+    # Extended Args
+    adj_mx_filepath: Optional[str] = None
 
 def get_auto_device() -> torch.device:
     if torch.cuda.is_available():
@@ -32,8 +35,8 @@ def get_auto_device() -> torch.device:
 
     return device
 
-def get_config(config_path: str) -> Config:
+def get_config(config_path: str) -> HyperParams:
     with open(config_path, "r") as f:
         config_raw = yaml.load(f, Loader=yaml.FullLoader)
 
-    return Config(**config_raw)
+    return HyperParams(**config_raw)

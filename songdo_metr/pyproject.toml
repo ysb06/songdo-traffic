@@ -2,9 +2,7 @@
 name = "songdo_metr"
 version = "0.1.0"
 description = "Default template for PDM package"
-authors = [
-    {name = "Seungbin Yim", email = "ysb06@hotmail.com"},
-]
+authors = [{ name = "Seungbin Yim", email = "ysb06@hotmail.com" }]
 dependencies = [
     "torch~=2.2.1",
     "torchvision~=0.17.1",
@@ -19,8 +17,7 @@ dependencies = [
 ]
 requires-python = "==3.11.*"
 readme = "README.md"
-license = {text = "MIT"}
-
+license = { text = "MIT" }
 
 [tool.pdm]
 distribution = false
