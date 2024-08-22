@@ -26,6 +26,8 @@ class HyperParams:
     seed: int
     # Extended Args
     adj_mx_filepath: Optional[str] = None
+    train_ratio: Optional[float] = 0.7
+    valid_ratio: Optional[float] = 0.1
 
 def get_auto_device() -> torch.device:
     if torch.cuda.is_available():

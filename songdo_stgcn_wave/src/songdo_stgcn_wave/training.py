@@ -25,6 +25,7 @@ from wandb import Config
 
 from .utils import HyperParams, get_auto_device
 from metr.components.adj_mx import import_adj_mx
+from metr.dataloader import MetrDataset
 
 
 def train_new(config: HyperParams):
@@ -37,17 +38,20 @@ def train_new(config: HyperParams):
     # wandb_config: Config = wandb.config
     # wandb_config.update({"device": str(training_divice)})
 
-    print(f"Starting run {run_name}")
-    with open(config.sensorsfilepath) as f:
-        sensor_ids = f.read().strip().split(",")
-    distance_df = pd.read_csv(config.disfilepath, dtype={"from": "str", "to": "str"})
+    adj_mx_raw = import_adj_mx(config.adj_mx_filepath)
+    sparse_mx = sp.coo_matrix(adj_mx_raw.adj_mx)
+    G = dgl.from_scipy(sparse_mx)
 
-    sensor_id_to_ind = {}
-    for i, sensor_id in enumerate(sensor_ids):
-        sensor_id_to_ind[sensor_id] = i
+    dataset = MetrDataset.from_file(config.tsfilepath, config.window, config.pred_len)
+    train_subset, val_subset, test_subset = dataset.split(
+        train_ratio=config.train_ratio, valid_ratio=config.valid_ratio
+    )
 
-    adj_mx = get_adjacency_matrix(distance_df, sensor_ids)
-    adj_mx_2 = import_adj_mx(config.adj_mx_filepath)
+    train_iter = DataLoader(train_subset, collate_fn=MetrDataset.collate_fn)
+    valid_iter = DataLoader(val_subset, collate_fn=MetrDataset.collate_fn)
+    test_iter = DataLoader(test_subset, collate_fn=MetrDataset.collate_fn)
+
+    # wandb.finish()
 
 
 def train(config: HyperParams):
@@ -55,7 +59,7 @@ def train(config: HyperParams):
         f"{config.dataset_name}_STGCN_WAVE_{datetime.now().strftime('%y%m%d_%H%M%S')}"
     )
     training_divice = get_auto_device()
-    wandb.init(project='METR-IMC', name=run_name, config=asdict(config))
+    wandb.init(project="METR-IMC", name=run_name, config=asdict(config))
     wandb.config.update({"device": str(training_divice)})
 
     with open(config.sensorsfilepath) as f:
@@ -174,7 +178,14 @@ def train(config: HyperParams):
         )
 
     best_model = STGCN_WAVE(
-        blocks, n_his, n_route, G, drop_prob, num_layers, training_divice, config.control_str
+        blocks,
+        n_his,
+        n_route,
+        G,
+        drop_prob,
+        num_layers,
+        training_divice,
+        config.control_str,
     ).to(training_divice)
     best_model.load_state_dict(torch.load(save_path))
 

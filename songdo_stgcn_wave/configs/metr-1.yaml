@@ -8,7 +8,6 @@ dataset_name: METR-IMC
 sensorsfilepath: ../datasets/metr-imc/subsets/metr-1-cleaned/metr_ids.txt
 disfilepath: ../datasets/metr-imc/subsets/metr-1-cleaned/distances_imc_2023.csv
 tsfilepath: ../datasets/metr-imc/subsets/metr-1-cleaned/metr-imc.h5
-adj_mx_filepath: ../datasets/metr-imc/subsets/metr-1-cleaned/adj_mx.pkl
 savemodelpath: output/stgcnwavemodel_1.pt
 pred_len: 5
 control_str: TNTSTNTST
@@ -20,3 +19,7 @@ channels:
   - 32
   - 128
 seed: 42
+
+adj_mx_filepath: ../datasets/metr-imc/subsets/metr-1-cleaned/adj_mx.pkl
+train_ratio: 0.7
+valid_ratio: 0.1
