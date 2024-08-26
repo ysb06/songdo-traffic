@@ -1,15 +1,22 @@
 import argparse
 import os
+import logging
 
 from .training import train, train_new
 from .utils import get_config
 from .test import test_model
 
+logger = logging.getLogger(__name__)
+
 
 def run():
     parser = argparse.ArgumentParser(description="STGCN_WAVE")
-    parser.add_argument("--training_only", action="store_true", help="Run Model Training Only")
-    parser.add_argument("--test_only", action="store_true", help="Run Model Training Only")
+    parser.add_argument(
+        "--training_only", action="store_true", help="Run Model Training Only"
+    )
+    parser.add_argument(
+        "--test_only", action="store_true", help="Run Model Training Only"
+    )
     parser.add_argument(
         "--config", default="base", type=str, help="Config file for hyper-parameters"
     )
@@ -35,7 +42,7 @@ def run():
     parser.add_argument("--seed", type=int, help="seed for training")
 
     args = parser.parse_args()
-    
+
     config_path = os.path.join("configs", f"{args.config}.yaml")
     config = get_config(config_path)
 
@@ -44,10 +51,13 @@ def run():
             setattr(config, key, value)
 
     if not args.test_only:
+        logger.info(f"Start Training Model with:\r\n{config}")
         train_new(config)
-    
+
     if not args.training_only:
+        logger.info(f"Start Testing Model with:\r\n{config}")
         test_model(config)
+
 
 if __name__ == "__main__":
     run()

@@ -23,18 +23,17 @@ class MetrDataset(Dataset):
         data_df: pd.DataFrame,
         history_len: int,
         prediction_len: int,
-        device: Union[str, torch.device] = torch.device("cpu"),
     ) -> None:
         super().__init__()
         self.raw_df = data_df
         self.num_samples, self.num_nodes = self.raw_df.shape
         self.history_len = history_len
         self.prediction_len = prediction_len
-        self.device = device
 
         # 스케일러 적용
-        scaled_data = StandardScaler().fit_transform(self.raw_df)
-        self.data = torch.tensor(scaled_data, dtype=torch.float32).to(self.device)
+        self.scaler_for_all = StandardScaler().fit(self.raw_df)
+        scaled_data = self.scaler_for_all.transform(self.raw_df)
+        self.data = torch.tensor(scaled_data, dtype=torch.float32)
 
     def __len__(self) -> int:
         return self.num_samples - self.history_len - self.prediction_len
@@ -57,7 +56,7 @@ class MetrDataset(Dataset):
                                             to ensure independence between subsets. Defaults to False.
 
         Returns:
-            Tuple[Subset, Subset, Subset]: The training, validation, and testing subsets.
+            Tuple[Subset,Subset,Subset,StandardScaler]: The split subsets with scaler based on training data.
         """
 
         len_train = round(self.num_samples * train_ratio)
@@ -70,13 +69,11 @@ class MetrDataset(Dataset):
         test_indices = total_indices[len_train + len_valid :]
 
         train_df = self.raw_df.iloc[total_indices[:len_train]]
-        scaler = StandardScaler().fit(train_df)
-        self.data = torch.tensor(scaler.transform(self.raw_df), dtype=torch.float32).to(
-            self.device
-        )
+        split_scaler = StandardScaler().fit(train_df)
+        self.data = torch.tensor(split_scaler.transform(self.raw_df), dtype=torch.float32)
 
         train_subset = Subset(self, train_indices)
         val_subset = Subset(self, valid_indices)
         test_subset = Subset(self, test_indices)
 
-        return train_subset, val_subset, test_subset
+        return train_subset, val_subset, test_subset, split_scaler

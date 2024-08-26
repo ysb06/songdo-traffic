@@ -76,6 +76,7 @@ class MetrImcSubsetGenerator:
         graph_sensor_loc_filename: str = "graph_sensor_locations.csv",
         distances_imc_filename: str = "distances_imc_2023.csv",
         adj_mx_filename: str = "adj_mx.pkl",
+        metr_imc_extra_filename: str = "metr-imc-extra.h5",
     ) -> None:
         self.nodelink_dir = nodelink_dir
         self.imcrts_dir = imcrts_dir
@@ -90,6 +91,7 @@ class MetrImcSubsetGenerator:
         )
 
         self.metr_imc_path = os.path.join(metr_imc_dir, metr_imc_filename)
+        self.metr_imc_extra_path = os.path.join(metr_imc_dir, metr_imc_extra_filename)
         self.metr_imc_df: Optional[pd.DataFrame] = None
         if os.path.exists(self.metr_imc_path):
             self.metr_imc_df = pd.DataFrame(pd.read_hdf(self.metr_imc_path))
@@ -153,6 +155,11 @@ class MetrImcSubsetGenerator:
             metr_imc = self.metr_imc_df[targets]
 
         if interpolate_filter is not None:
+            logger.info(f"Generate missing value marking data...")
+            is_missing_values = metr_imc.isna()
+            is_missing_values.to_hdf(self.metr_imc_extra_path, key="is_missing")
+            excel_path = os.path.splitext(self.metr_imc_extra_path)[0] + ".xlsx"
+            is_missing_values.to_excel(excel_path)
             logger.info(f"Interpolating...")
             metr_imc = interpolate_filter.interpolate(metr_imc)
             logger.info(f"Interpolating Finished!")

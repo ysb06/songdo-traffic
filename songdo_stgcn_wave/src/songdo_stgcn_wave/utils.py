@@ -1,11 +1,10 @@
-from typing import Optional
+from typing import Dict, Optional, Union
 import torch
-import gc
-import os
 import random
-from datetime import datetime
 from dataclasses import dataclass
 import yaml
+import numpy as np
+
 
 @dataclass
 class HyperParams:
@@ -28,6 +27,9 @@ class HyperParams:
     adj_mx_filepath: Optional[str] = None
     train_ratio: Optional[float] = 0.7
     valid_ratio: Optional[float] = 0.1
+    drop_rate: Optional[float] = 0.0
+    scheduler: Optional[Dict[str, Union[int, float]]] = {"step_size": 5, "gamma": 0.7}
+
 
 def get_auto_device() -> torch.device:
     if torch.cuda.is_available():
@@ -37,8 +39,18 @@ def get_auto_device() -> torch.device:
 
     return device
 
+
 def get_config(config_path: str) -> HyperParams:
     with open(config_path, "r") as f:
         config_raw = yaml.load(f, Loader=yaml.FullLoader)
 
     return HyperParams(**config_raw)
+
+def fix_seed(seed: int):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False

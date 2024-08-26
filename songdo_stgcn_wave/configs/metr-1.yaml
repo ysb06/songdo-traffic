@@ -23,3 +23,7 @@ seed: 42
 adj_mx_filepath: ../datasets/metr-imc/subsets/metr-1-cleaned/adj_mx.pkl
 train_ratio: 0.7
 valid_ratio: 0.1
+drop_rate: 0
+scheduler:
+  step_size: 5
+  gamma: 0.7

@@ -7,9 +7,11 @@ from torch.utils.data import DataLoader, TensorDataset
 from songdo_stgcn_wave.utils import HyperParams, get_config
 from stgcn_wave.load_data import data_transform
 
+
 def test_dataset():
     run_comparison("./configs/base.yaml")
     run_comparison("./configs/metr-1.yaml")
+
 
 def run_comparison(config_path: str):
     config = get_config(config_path)
@@ -61,9 +63,15 @@ def get_metr_dataloaders(config: HyperParams, training_ratio=0.7, val_ratio=0.1)
     dataset = MetrDataset.from_file(config.tsfilepath, config.window, config.pred_len)
     train_subset, val_subset, test_subset = dataset.split(training_ratio, val_ratio)
 
-    train_loader_metr = DataLoader(train_subset, collate_fn=MetrDataset.collate_fn)
-    val_loader_metr = DataLoader(val_subset, collate_fn=MetrDataset.collate_fn)
-    test_loader_metr = DataLoader(test_subset, collate_fn=MetrDataset.collate_fn)
+    train_loader_metr = DataLoader(
+        train_subset, batch_size=config.batch_size, collate_fn=MetrDataset.collate_fn
+    )
+    val_loader_metr = DataLoader(
+        val_subset, batch_size=config.batch_size, collate_fn=MetrDataset.collate_fn
+    )
+    test_loader_metr = DataLoader(
+        test_subset, batch_size=config.batch_size, collate_fn=MetrDataset.collate_fn
+    )
 
     return train_loader_metr, val_loader_metr, test_loader_metr
 
