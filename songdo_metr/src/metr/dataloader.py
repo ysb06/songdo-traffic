@@ -2,38 +2,90 @@ import torch
 from torch.utils.data import Dataset, DataLoader, Subset
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
-from typing import Tuple, Union
+from typing import Optional, Tuple, Union
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class MetrDataset(Dataset):
     @staticmethod
     def from_file(
-        file_path: str, history_len: int, prediction_len: int
+        data_path: str,
+        history_len: int,
+        prediction_len: int,
+        missing_value_path: Optional[str] = None,
     ) -> "MetrDataset":
-        return MetrDataset(pd.read_hdf(file_path), history_len, prediction_len)
+        return MetrDataset(
+            pd.read_hdf(data_path),
+            history_len,
+            prediction_len,
+            pd.read_hdf(missing_value_path, key="missing") if missing_value_path else None,
+        )
 
     @staticmethod
     def collate_fn(batch):
         x_batch = torch.stack([item[0] for item in batch])
         y_batch = torch.stack([item[1] for item in batch])
+
         return x_batch, y_batch
+
+    @staticmethod
+    def collate_fn_with_missing(batch):
+        x_batch = torch.stack([item[0] for item in batch])
+        y_batch = torch.stack([item[1] for item in batch])
+        # May error occur if missing_y_batch is None
+        missing_y_batch = torch.stack([item[5] for item in batch])
+
+        return x_batch, y_batch, missing_y_batch
+
+    @staticmethod
+    def collate_fn_debug(batch):
+        x_batch = torch.stack([item[0] for item in batch])
+        y_batch = torch.stack([item[1] for item in batch])
+        raw_x_batch = torch.stack([item[2] for item in batch])
+        raw_y_batch = torch.stack([item[3] for item in batch])
+        missing_x_batch = torch.stack([item[4] for item in batch])
+        missing_y_batch = torch.stack([item[5] for item in batch])
+
+        return (
+            x_batch,
+            y_batch,
+            raw_x_batch,
+            raw_y_batch,
+            missing_x_batch,
+            missing_y_batch,
+        )
 
     def __init__(
         self,
         data_df: pd.DataFrame,
         history_len: int,
         prediction_len: int,
+        missing_df: Optional[pd.DataFrame] = None,
     ) -> None:
         super().__init__()
         self.raw_df = data_df
         self.num_samples, self.num_nodes = self.raw_df.shape
         self.history_len = history_len
         self.prediction_len = prediction_len
+        self.missing_df = missing_df
+        if self.missing_df is None:
+            logger.warning(
+                "No missing value label. This may cause errors or incorrect calculations for some metrics."
+            )
 
         # 스케일러 적용
         self.scaler_for_all = StandardScaler().fit(self.raw_df)
+        logger.info(f"Fitting StandardScaler(All) Complete")
         scaled_data = self.scaler_for_all.transform(self.raw_df)
+        self.raw_data = torch.tensor(self.raw_df.to_numpy(), dtype=torch.int32)
         self.data = torch.tensor(scaled_data, dtype=torch.float32)
+        self.missings_data = (
+            torch.tensor(self.missing_df.to_numpy())
+            if self.missing_df is not None
+            else None
+        )
 
     def __len__(self) -> int:
         return self.num_samples - self.history_len - self.prediction_len
@@ -41,10 +93,26 @@ class MetrDataset(Dataset):
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor]:
         x = self.data[index : index + self.history_len]
         y = self.data[index + self.history_len + self.prediction_len - 1]
-        return x.unsqueeze(0), y
+        raw_x = self.raw_data[index : index + self.history_len]
+        raw_y = self.raw_data[index + self.history_len + self.prediction_len - 1]
+        if self.missing_df is None:
+            return x.unsqueeze(0), y, raw_x.unsqueeze(0), raw_y
+        else:
+            missing_x = self.missings_data[index : index + self.history_len]
+            missing_y = self.missings_data[
+                index + self.history_len + self.prediction_len - 1
+            ]
+            return x.unsqueeze(0), y, raw_x.unsqueeze(0), raw_y, missing_x, missing_y
+
+    @property
+    def is_missing_value_labeled(self):
+        return self.missing_df is not None
 
     def split(
-        self, train_ratio: float = 0.7, valid_ratio: float = 0.1, allow_overlap: bool = False
+        self,
+        train_ratio: float = 0.7,
+        valid_ratio: float = 0.1,
+        allow_overlap: bool = False,
     ) -> Tuple[Subset, Subset, Subset]:
         """Generates subsets for training, validation, and testing. The test ratio is automatically calculated.
 
@@ -70,7 +138,10 @@ class MetrDataset(Dataset):
 
         train_df = self.raw_df.iloc[total_indices[:len_train]]
         split_scaler = StandardScaler().fit(train_df)
-        self.data = torch.tensor(split_scaler.transform(self.raw_df), dtype=torch.float32)
+        logger.info(f"Fitting StandardScaler(Training) Complete")
+        self.data = torch.tensor(
+            split_scaler.transform(self.raw_df), dtype=torch.float32
+        )
 
         train_subset = Subset(self, train_indices)
         val_subset = Subset(self, valid_indices)

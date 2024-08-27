@@ -25,6 +25,7 @@ from wandb import Config
 from .utils import HyperParams, get_auto_device, fix_seed
 from metr.components.adj_mx import import_adj_mx
 from metr.dataloader import MetrDataset
+from .test import evaluate_model_
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +49,12 @@ def train_new(config: HyperParams):
     sparse_mx = sp.coo_matrix(adj_mx_raw.adj_mx)
     G = dgl.from_scipy(sparse_mx)
 
-    dataset = MetrDataset.from_file(config.tsfilepath, config.window, config.pred_len)
+    dataset = MetrDataset.from_file(
+        config.tsfilepath,
+        config.window,
+        config.pred_len,
+        config.missing_labels_filepath,
+    )
     train_subset, val_subset, test_subset, scaler = dataset.split(
         train_ratio=config.train_ratio, valid_ratio=config.valid_ratio
     )
@@ -60,7 +66,9 @@ def train_new(config: HyperParams):
         val_subset, batch_size=config.batch_size, collate_fn=MetrDataset.collate_fn
     )
     test_iter = DataLoader(
-        test_subset, batch_size=config.batch_size, collate_fn=MetrDataset.collate_fn
+        test_subset,
+        batch_size=config.batch_size,
+        collate_fn=MetrDataset.collate_fn_with_missing,
     )
 
     model = STGCN_WAVE(
@@ -77,7 +85,7 @@ def train_new(config: HyperParams):
     optimizer = torch.optim.RMSprop(model.parameters(), lr=config.lr)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, **config.scheduler)
 
-    wandb.watch(model)
+    # wandb.watch(model)
 
     min_valid_loss = np.inf
     for epoch in range(1, config.epochs + 1):
@@ -85,7 +93,7 @@ def train_new(config: HyperParams):
         epoch_loss = __train_model(
             train_iter, model, loss_fn, optimizer, training_device
         )
-        scheduler.step()    # Update at new epoch
+        scheduler.step()  # Update at new epoch
         valid_loss = __validate_model(valid_iter, model, loss_fn, training_device)
 
         log_content = {
@@ -100,9 +108,7 @@ def train_new(config: HyperParams):
             logger.info("Best Model Found!")
             min_valid_loss = valid_loss
             torch.save(model.state_dict(), config.savemodelpath)
-            MAE, MAPE, RMSE = __evaluate_model(
-                test_iter, scaler, model, training_device
-            )
+            MAE, MAPE, RMSE = evaluate_model_(test_iter, scaler, model, training_device)
             eval_result = {
                 "epoch_MAE": MAE,
                 "epoch_RMSE": RMSE,
@@ -125,7 +131,7 @@ def train_new(config: HyperParams):
     )
     best_model.load_state_dict(torch.load(config.savemodelpath))
 
-    MAE, MAPE, RMSE = __evaluate_model(test_iter, scaler, model, training_device)
+    MAE, MAPE, RMSE = evaluate_model_(test_iter, scaler, model, training_device)
     test_result = {"test_MAE": MAE, "test_RMSE": RMSE, "test_MAPE": MAPE}
     logger.info(f"Test Result:\r\n{test_result}")
     wandb.log(test_result)
@@ -170,6 +176,7 @@ def __validate_model(
     loss_sum = 0.0
     with torch.no_grad():
         for x, y in tqdm(dataloader):
+            # Todo: Check if missing_value is correctly handled
             x: Tensor = x.to(device)
             y: Tensor = y.to(device)
             y_pred: Tensor = model(x)
@@ -180,37 +187,6 @@ def __validate_model(
 
     return loss_ave
 
-
-def __evaluate_model(
-    dataloader: DataLoader,
-    scaler: StandardScaler,
-    model: nn.Module,
-    device: torch.device,
-):
-    model = model.to(device)
-    model.eval()
-
-    mae_sum, mape_sum, mse_sum = 0.0, 0.0, 0.0
-    with torch.no_grad():
-        for x, y in tqdm(dataloader):
-            x: Tensor = x.to(device)
-            y: Tensor = y.to(device)
-            y_pred: Tensor = model(x)
-            y_pred = y_pred.view(len(x), -1)
-
-            y_true = scaler.inverse_transform(y.cpu().numpy()).squeeze()
-            y_hat = scaler.inverse_transform(y_pred.cpu().numpy()).squeeze()
-            d = np.abs(y_true - y_hat)
-            mae_sum += d.sum()
-            mape_sum += np.where(y_true != 0, (d / y_true), 0).sum()
-            mse_sum += (d**2).sum()
-
-    total_count = len(dataloader.dataset)
-    MAE = mae_sum / total_count
-    MAPE = mape_sum / total_count
-    RMSE = np.sqrt(mse_sum / total_count)
-
-    return MAE, MAPE, RMSE
 
 # Todo: 데이터셋에서 결측치 여부에 대한 레이블링을 추가
 # Todo: collate_fn을 다르게하여 결측치 레이블을 추가할지 말지를 결정

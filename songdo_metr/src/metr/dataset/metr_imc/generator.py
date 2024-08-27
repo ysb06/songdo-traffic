@@ -143,7 +143,7 @@ class MetrImcSubsetGenerator:
         self,
         targets: Optional[List[str]] = None,
         interpolate_filter: Optional[Interpolator] = None,
-    ) -> Tuple[pd.DataFrame, List[str]]:
+    ) -> Tuple[pd.DataFrame, List[str], pd.DataFrame, pd.DataFrame]:
         if self.metr_imc_df is None:
             raise FileNotFoundError(f"{self.metr_imc_path} not found.")
 
@@ -157,14 +157,14 @@ class MetrImcSubsetGenerator:
         if interpolate_filter is not None:
             logger.info(f"Generate missing value marking data...")
             is_missing_values = metr_imc.isna()
-            is_missing_values.to_hdf(self.metr_imc_extra_path, key="is_missing")
-            excel_path = os.path.splitext(self.metr_imc_extra_path)[0] + ".xlsx"
-            is_missing_values.to_excel(excel_path)
+            logger.info(f"Generate missing value marking data Finished!")
             logger.info(f"Interpolating...")
-            metr_imc = interpolate_filter.interpolate(metr_imc)
+            metr_imc_int = interpolate_filter.interpolate(metr_imc)
             logger.info(f"Interpolating Finished!")
 
-        return metr_imc, targets
+            return metr_imc_int, targets, metr_imc, is_missing_values
+        else:
+            return metr_imc, targets, None, None
 
     def generate_subset(
         self,
@@ -178,11 +178,23 @@ class MetrImcSubsetGenerator:
         # 새 데이터 생성
         # METR-IMC
         metr_imc_path = os.path.join(output_dir, os.path.split(self.metr_imc_path)[1])
+        metr_imc_extra_path = os.path.join(output_dir, os.path.split(self.metr_imc_extra_path)[1])
+        metr_imc_raw_excel_path = os.path.join(output_dir, "miscellaneous", "metr_raw.xlsx")
+        metr_imc_missing_excel_path = os.path.join(output_dir, "miscellaneous", "missings.xlsx")
         logger.info(
             f"Generating {metr_imc_path} with {self.metr_imc_df.shape} [Length: {len(targets)}]..."
         )
-        metr_imc, targets = self.process_metr_imc(targets, interpolate_filter)
+        metr_imc, targets, raw, missings = self.process_metr_imc(targets, interpolate_filter)
         metr_imc.to_hdf(metr_imc_path, key="data")
+        if raw is not None:
+            logger.info(f"Generating {metr_imc_extra_path}...")
+            raw.to_hdf(metr_imc_extra_path, key="raw")
+            missings.to_hdf(metr_imc_extra_path, key="missing")
+            logger.info(f"Generating {metr_imc_raw_excel_path} with {raw.shape}...")
+            raw.to_excel(metr_imc_raw_excel_path)
+            logger.info(f"Generating {metr_imc_missing_excel_path} with {missings.shape}...")
+            missings.to_excel(metr_imc_missing_excel_path)
+            
 
         # Sensor IDs
         logger.info(

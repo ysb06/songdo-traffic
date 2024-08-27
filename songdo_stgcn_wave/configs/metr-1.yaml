@@ -19,8 +19,9 @@ channels:
   - 32
   - 128
 seed: 42
-
+# Extra Parameters
 adj_mx_filepath: ../datasets/metr-imc/subsets/metr-1-cleaned/adj_mx.pkl
+missing_labels_filepath: ../datasets/metr-imc/subsets/metr-1-cleaned/metr-imc-extra.h5
 train_ratio: 0.7
 valid_ratio: 0.1
 drop_rate: 0

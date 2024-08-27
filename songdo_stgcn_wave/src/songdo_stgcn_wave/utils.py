@@ -1,7 +1,7 @@
 from typing import Dict, Optional, Union
 import torch
 import random
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import yaml
 import numpy as np
 
@@ -25,10 +25,11 @@ class HyperParams:
     seed: int
     # Extended Args
     adj_mx_filepath: Optional[str] = None
+    missing_labels_filepath: Optional[str] = None
     train_ratio: Optional[float] = 0.7
     valid_ratio: Optional[float] = 0.1
     drop_rate: Optional[float] = 0.0
-    scheduler: Optional[Dict[str, Union[int, float]]] = {"step_size": 5, "gamma": 0.7}
+    scheduler: Optional[Dict[str, Union[int, float]]] = field(default_factory=lambda: {"step_size": 5, "gamma": 0.7})
 
 
 def get_auto_device() -> torch.device:

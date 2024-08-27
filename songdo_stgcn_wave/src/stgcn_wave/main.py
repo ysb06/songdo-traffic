@@ -158,7 +158,7 @@ for epoch in range(1, epochs + 1):
         l_sum += l.item() * y.shape[0]
         n += y.shape[0]
     scheduler.step()
-    val_loss = evaluate_model(model, loss, val_iter)
+    val_loss = evaluate_model_(model, loss, val_iter)
     if val_loss < min_val_loss:
         min_val_loss = val_loss
         torch.save(model.state_dict(), save_path)
@@ -178,6 +178,6 @@ best_model = STGCN_WAVE(
 best_model.load_state_dict(torch.load(save_path))
 
 
-l = evaluate_model(best_model, loss, test_iter)
+l = evaluate_model_(best_model, loss, test_iter)
 MAE, MAPE, RMSE = evaluate_metric(best_model, test_iter, scaler)
 print("test loss:", l, "\nMAE:", MAE, ", MAPE:", MAPE, ", RMSE:", RMSE)
