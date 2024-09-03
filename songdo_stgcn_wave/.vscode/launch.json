@@ -11,7 +11,7 @@
 			"request": "launch",
 			"module": "songdo_stgcn_wave",
 			"console": "integratedTerminal",
-			"args": ["--config", "metr-1"],
+			"args": ["--config", "metr-3"],
 			"env": {
 				"PYTHONPATH": "./src"
 			}
@@ -22,7 +22,7 @@
 			"request": "launch",
 			"module": "songdo_stgcn_wave",
 			"console": "integratedTerminal",
-			"args": ["--config", "metr-1", "--test_only"],
+			"args": ["--config", "metr-3", "--test_only"],
 			"env": {
 				"PYTHONPATH": "./src"
 			}

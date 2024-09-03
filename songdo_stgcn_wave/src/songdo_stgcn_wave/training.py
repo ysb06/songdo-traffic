@@ -48,6 +48,7 @@ def train_new(config: HyperParams):
     adj_mx_raw = import_adj_mx(config.adj_mx_filepath)
     sparse_mx = sp.coo_matrix(adj_mx_raw.adj_mx)
     G = dgl.from_scipy(sparse_mx)
+    G = G.to(training_device)
 
     dataset = MetrDataset.from_file(
         config.tsfilepath,
@@ -85,7 +86,7 @@ def train_new(config: HyperParams):
     optimizer = torch.optim.RMSprop(model.parameters(), lr=config.lr)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, **config.scheduler)
 
-    # wandb.watch(model)
+    wandb.watch(model)
 
     min_valid_loss = np.inf
     for epoch in range(1, config.epochs + 1):

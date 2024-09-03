@@ -19,3 +19,12 @@ channels:
   - 32
   - 128
 seed: 42
+# Extra Parameters
+adj_mx_filepath: ../datasets/metr-imc/subsets/metr-2-less500/adj_mx.pkl
+missing_labels_filepath: ../datasets/metr-imc/subsets/metr-2-less500/metr-imc-extra.h5
+train_ratio: 0.7
+valid_ratio: 0.1
+drop_rate: 0
+scheduler:
+  step_size: 5
+  gamma: 0.7
