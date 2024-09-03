@@ -1,26 +1,18 @@
-import os
-import random
-from dataclasses import asdict
-from datetime import datetime
 import logging
+import os
 
 import dgl
 import numpy as np
-import pandas as pd
 import scipy.sparse as sp
 import torch
 import torch.nn as nn
 from sklearn.preprocessing import StandardScaler
 from torch import Tensor
-from torch.utils.data import DataLoader, TensorDataset
+from torch.utils.data import DataLoader
 from tqdm import tqdm
+import pandas as pd
 
-import wandb
-from stgcn_wave.load_data import data_transform
 from stgcn_wave.model import STGCN_WAVE
-from stgcn_wave.sensors2graph import get_adjacency_matrix
-from stgcn_wave.utils import evaluate_metric, evaluate_model
-from wandb import Config
 
 from .utils import HyperParams, get_auto_device, fix_seed
 from metr.components.adj_mx import import_adj_mx
@@ -31,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 def test_model(config: HyperParams):
     logger.info(f"Test for {config.dataset_name}")
-    training_device = get_auto_device()
+    test_device = get_auto_device()
     fix_seed(config.seed)
     adj_mx_raw = import_adj_mx(config.adj_mx_filepath)
     sparse_mx = sp.coo_matrix(adj_mx_raw.adj_mx)
@@ -43,8 +35,13 @@ def test_model(config: HyperParams):
         config.pred_len,
         config.missing_labels_filepath,
     )
+    _, _, test_dataset, scaler = dataset.split()
+    start_index = test_dataset.indices[0]
+    end_index = test_dataset.indices[-1]
+    test_size = end_index - start_index + 1
+
     test_loader = DataLoader(
-        dataset,
+        test_dataset,
         batch_size=config.batch_size,
         collate_fn=MetrDataset.collate_fn_with_missing,
     )
@@ -55,16 +52,60 @@ def test_model(config: HyperParams):
         G,
         config.drop_rate,  # Dropout Rate (Normally 0)
         config.num_layers,
-        training_device,  # Device
+        test_device,  # Device
         config.control_str,
     )
-    best_model.load_state_dict(torch.load(config.savemodelpath))
+    best_model.load_state_dict(torch.load(config.savemodelpath, map_location=test_device))
     MAE, MAPE, RMSE = evaluate_model_(
-        test_loader, dataset.scaler_for_all, best_model, training_device
+        test_loader, scaler, best_model, test_device
     )
     test_result = {"test_MAE": MAE, "test_RMSE": RMSE, "test_MAPE": MAPE}
     logger.info(f"Test Result:\r\n{test_result}")
 
+    y_true, y_hat = predict(test_loader, scaler, best_model, test_device)
+    time_index = dataset.raw_df.index[-test_size:]
+    idx_to_sensor_id = {v: k for k, v in adj_mx_raw.sensor_id_to_idx.items()}
+    columns = [idx_to_sensor_id[i] for i in range(y_true.shape[1])]
+
+    y_true_df = pd.DataFrame(y_true, index=time_index, columns=columns)
+    y_hat_df = pd.DataFrame(y_hat, index=time_index, columns=columns)
+    
+    output_dir = "./output/"
+    os.makedirs(output_dir, exist_ok=True)
+    
+    with pd.ExcelWriter("./output/predictions.xlsx") as writer:
+        y_true_df.to_excel(writer, sheet_name="Y_True")
+        y_hat_df.to_excel(writer, sheet_name="Y_Hat")
+
+
+def predict(
+    dataloader: DataLoader,
+    scaler: StandardScaler,
+    model: nn.Module,
+    device: torch.device,
+):
+    model = model.to(device)
+    model.eval()
+
+    y_true_list = []
+    y_hat_list = []
+    with torch.no_grad():
+        for x, y, _ in tqdm(dataloader):
+            x: Tensor = x.to(device)
+            y: Tensor = y.to(device)
+            y_pred: Tensor = model(x)
+            y_pred = y_pred.view(len(x), -1)
+
+            y_true = scaler.inverse_transform(y.cpu().numpy()).squeeze()
+            y_hat = scaler.inverse_transform(y_pred.cpu().numpy()).squeeze()
+
+            y_true_list.append(y_true)
+            y_hat_list.append(y_hat)
+    
+    y_true_series = np.concatenate(y_true_list, axis=0)
+    y_hat_series = np.concatenate(y_hat_list, axis=0)
+
+    return y_true_series, y_hat_series
 
 def evaluate_model_(
     dataloader: DataLoader,

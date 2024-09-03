@@ -113,7 +113,7 @@ class MetrDataset(Dataset):
         train_ratio: float = 0.7,
         valid_ratio: float = 0.1,
         allow_overlap: bool = False,
-    ) -> Tuple[Subset, Subset, Subset]:
+    ) -> Tuple[Subset, Subset, Subset, StandardScaler]:
         """Generates subsets for training, validation, and testing. The test ratio is automatically calculated.
 
         Args:

@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 class AdjacencyMatrix:
     def __init__(
-        self, data: Optional[Tuple[List[str], Dict[str, str], np.ndarray]] = None
+        self, data: Optional[Tuple[List[str], Dict[str, int], np.ndarray]] = None
     ) -> None:
         self.data = data
 
@@ -20,7 +20,7 @@ class AdjacencyMatrix:
         return self.data[0]
 
     @property
-    def sensor_id_to_idx(self) -> Dict[str, str]:
+    def sensor_id_to_idx(self) -> Dict[str, int]:
         return self.data[1]
 
     @property

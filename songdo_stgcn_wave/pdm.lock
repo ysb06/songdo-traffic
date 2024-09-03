@@ -5,7 +5,7 @@
 groups = ["default", "dev"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:3d330935d54b665a0466447eac624a992f4131831ab7e7e2e5d748db6ba7e635"
+content_hash = "sha256:79cbd4b11cbbaf565617f331f500d3939462cf8d948fd0538525bf2839a1bee4"
 
 [[metadata.targets]]
 requires_python = "==3.11.*"
@@ -153,7 +153,7 @@ name = "et-xmlfile"
 version = "1.1.0"
 requires_python = ">=3.6"
 summary = "An implementation of lxml.xmlfile for the standard library"
-groups = ["dev"]
+groups = ["default", "dev"]
 files = [
     {file = "et_xmlfile-1.1.0-py3-none-any.whl", hash = "sha256:a2ba85d1d6a74ef63837eed693bcb89c3f752169b0e3e7ae5b16ca5e1b3deada"},
     {file = "et_xmlfile-1.1.0.tar.gz", hash = "sha256:8eb9e2bc2f8c97e37a2dc85a09ecdcdec9d8a396530a6d5a33b30b9a92da0c5c"},
@@ -535,7 +535,7 @@ name = "openpyxl"
 version = "3.1.5"
 requires_python = ">=3.8"
 summary = "A Python library to read/write Excel 2010 xlsx/xlsm files"
-groups = ["dev"]
+groups = ["default", "dev"]
 dependencies = [
     "et-xmlfile",
 ]
@@ -943,9 +943,9 @@ dependencies = [
     "requests>=2.32.3",
     "scikit-learn>=1.5.1",
     "tables>=3.9.2",
-    "torchaudio~=2.2.1",
-    "torchvision~=0.17.1",
-    "torch~=2.2.1",
+    "torch<=2.3.0",
+    "torchaudio<=2.3.0",
+    "torchvision<=0.18.0",
     "tqdm>=4.66.4",
 ]
 
