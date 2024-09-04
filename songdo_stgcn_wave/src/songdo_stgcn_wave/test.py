@@ -28,6 +28,7 @@ def test_model(config: HyperParams):
     adj_mx_raw = import_adj_mx(config.adj_mx_filepath)
     sparse_mx = sp.coo_matrix(adj_mx_raw.adj_mx)
     G = dgl.from_scipy(sparse_mx)
+    G = G.to(test_device)
 
     dataset = MetrDataset.from_file(
         config.tsfilepath,
