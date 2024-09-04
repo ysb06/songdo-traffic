@@ -74,7 +74,9 @@ def test_model(config: HyperParams):
     output_dir = "./output/"
     os.makedirs(output_dir, exist_ok=True)
     
-    with pd.ExcelWriter("./output/predictions.xlsx") as writer:
+    output_path = os.path.join(output_dir, "predictions.xlsx")
+    logger.info(f"Saving predictions to {output_path}")
+    with pd.ExcelWriter(output_path) as writer:
         y_true_df.to_excel(writer, sheet_name="Y_True")
         y_hat_df.to_excel(writer, sheet_name="Y_Hat")
 

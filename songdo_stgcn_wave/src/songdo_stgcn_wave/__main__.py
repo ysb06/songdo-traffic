@@ -52,7 +52,7 @@ def run():
 
     if not args.test_only:
         logger.info(f"Start Training Model with:\r\n{config}")
-        train_new(config)
+        train(config)
 
     if not args.training_only:
         logger.info(f"Start Testing Model with:\r\n{config}")
