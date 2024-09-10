@@ -20,5 +20,7 @@
 			"name": "songdo_stgcn_wave",
 			"path": "songdo_stgcn_wave"
 		}
-	]
+	],
+	"settings": {
+	}
 }

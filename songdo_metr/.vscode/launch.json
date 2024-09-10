@@ -6,11 +6,31 @@
 	"version": "0.2.0",
 	"configurations": [
 		{
-			"name": "Generate Dataset (Songdo METR)",
+			"name": "Generate METR-IMC",
 			"type": "debugpy",
 			"request": "launch",
-			"module": "metr.dataset",
-			"console": "integratedTerminal"
+			"module": "metr.dataset.metr_imc",
+			"console": "integratedTerminal",
+		},
+		{
+			"name": "Generate Node-Link",
+			"type": "debugpy",
+			"request": "launch",
+			"module": "metr.dataset.nodelink",
+			"console": "integratedTerminal",
+		},
+		{
+			"name": "Generate IMCRTS",
+			"type": "debugpy",
+			"request": "launch",
+			"module": "metr.dataset.imcrts",
+			"console": "integratedTerminal",
+			"args": [
+				"--start_date",
+				"20230901",
+				"--end_date",
+				"20240831"
+			]
 		},
 		{
 			"name": "Python Debugger: Current File",

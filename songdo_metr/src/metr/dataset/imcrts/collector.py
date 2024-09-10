@@ -47,7 +47,7 @@ class IMCRTSCollector:
         self,
         key: str,
         start_date: str = "20230101",
-        end_date: str = "20231231", # Include the end date
+        end_date: str = "20231231",  # Include the end date
     ) -> None:
         logger.info("Collecting...")
         self.params = {
@@ -58,63 +58,22 @@ class IMCRTSCollector:
         }
         self.start_date: datetime = datetime.strptime(start_date, "%Y%m%d")
         self.end_date: datetime = datetime.strptime(end_date, "%Y%m%d")
-
-    def __check_overwrite(self, output_dir: str, file_name: str, total: int) -> bool:
-        pickle_path = os.path.join(output_dir, file_name + ".pkl")
-        excel_path = os.path.join(output_dir, file_name + ".xlsx")
-
-        if os.path.exists(pickle_path):
-            logger.warning(f"Pickle File Already Exists at {pickle_path}")
-            logger.info(f"Checking Pickle File...")
-            temp = pd.read_pickle(pickle_path)
-            logger.info(f"{len(temp)} Rows in Pickle File")
-            if len(temp) == total:
-                logger.info("Pickle File is Valid")
-            else:
-                logger.warning("Pickle File is Invalid")
-                return False
-        else:
-            return False
-
-        if os.path.exists(excel_path):
-            logger.warning(f"Excel File Already Exists at {excel_path}")
-            logger.info(f"Checking Excel File...")
-            temp = pd.read_excel(excel_path)
-            logger.info(f"{len(temp)} Rows in Excel File")
-            if len(temp) == total:
-                logger.info("Excel File is Valid")
-            else:
-                logger.warning("Excel File is Invalid")
-                return False
-        else:
-            return False
-
-        return True
+        self.data: Optional[pd.DataFrame] = None
 
     def collect(
         self,
-        output_dir: str,
         ignore_empty: bool = False,
         req_delay: float = 0.05,
-        file_name: str = "imcrts_data",
-        overwrite: bool = False,
     ) -> None:
         """
         데이터를 수집하고 Pandas DataFrame형태로 변환 후 Pickle 및 Excel형태로 저장
         """
-        if not os.path.exists(output_dir):
-            logger.info(f"Creating Directory at {output_dir}")
-            os.makedirs(output_dir, exist_ok=True)
-
         total_size = (self.end_date - self.start_date).days + 1
-        if not overwrite and self.__check_overwrite(output_dir, file_name, total_size):
-            logger.error("Skipping collecting due to existing valid files")
-            return
 
-        data_list = []
+        data_list: List[List[Dict[str, Any]]] = []
         current_date: datetime = self.start_date
 
-        logger.info(f"Collecting IMCRTS Data from {self.start_date} to {self.end_date}")
+        logger.info(f"Collecting IMCRTS Data from {self.start_date.date()} to {self.end_date.date()}")
         with tqdm(total=total_size) as bar:
             while current_date <= self.end_date:
                 current_date_string = current_date.strftime("%Y%m%d")
@@ -142,11 +101,17 @@ class IMCRTSCollector:
                 bar.update(1)
 
         df = pd.DataFrame(data_list)
-        logger.info(f"Total Row Count: {len(df)}")
+        self.data = df
+        logger.info(f"Data Collecting Finished: {self.data.shape}")
+        print(self.data)
+
+    def to_pickle(self, output_dir: str, file_name: str = "imcrts_data.pkl") -> None:
         logger.info("Creating Pickle...")
-        df.to_pickle(os.path.join(output_dir, file_name + ".pkl"))
+        self.data.to_pickle(os.path.join(output_dir, file_name))
+
+    def to_excel(self, output_dir: str, file_name: str = "imcrts_data.xlsx") -> None:
         logger.info("Creating Excel...")
-        df.to_excel(os.path.join(output_dir, file_name + ".xlsx"))
+        self.data.to_excel(os.path.join(output_dir, file_name))
 
     def get_data(
         self, params: Dict[str, Any]

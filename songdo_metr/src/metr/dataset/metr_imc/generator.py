@@ -45,7 +45,7 @@ class MetrImcDatasetGenerator:
         sensor_loc = GraphSensorLocations(self.road_gdf, metr_imc.road_ids)
         sensor_loc.to_csv(output_dir)
 
-        logger.info("distances_imc_2023.csv")
+        logger.info("distances_imc_2024.csv")
         distances_imc = DistancesImc(
             self.road_gdf, self.turninfo_gdf, metr_imc.road_ids
         )
@@ -55,10 +55,7 @@ class MetrImcDatasetGenerator:
         adj_mx = AdjacencyMatrix(distances_imc.distances, metr_imc.road_ids)
         adj_mx.to_pickle(output_dir)
 
-        # Todo: adjacency matrix
-        # Todo: 모델 학습 돌려보기
         # Todo: W_metrimc, SE_metrimc는 정확히 무엇인지 파악하고 작업. 일단은 우선 순위 낮음.
-
 
 class MetrImcSubsetGenerator:
     """Class for generating a subset of the Metr-IMC dataset."""

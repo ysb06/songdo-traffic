@@ -135,12 +135,6 @@ class MetrDataset(Dataset):
                 - val_subset (Subset): The validation subset of the dataset.
                 - test_subset (Subset): The test subset of the dataset.
                 - split_scaler (StandardScaler): A scaler fitted on the training data, which is applied to the entire dataset.
-
-        Notes:
-            - If `allow_training_overlap` is set to False, a gap of `history_len + prediction_offset` will be applied between 
-            the training and validation data to prevent overlap.
-            - Similarly, if `allow_test_overlap` is set to False, a gap of `history_len + prediction_offset` will be applied 
-            between the validation and test data to ensure no overlap.
         """
 
         len_train = round(self.num_samples * train_ratio)

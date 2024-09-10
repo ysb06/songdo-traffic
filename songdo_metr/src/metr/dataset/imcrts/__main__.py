@@ -3,12 +3,8 @@ from argparse import ArgumentParser
 import os
 
 from .collector import IMCRTSCollector, load_key
+from . import PDP_KEY, IMCRTS_DEFAULT_DIR
 
-logging.basicConfig(
-    format="%(asctime)s %(name)s [%(levelname)s] %(message)s",
-    datefmt="%Y/%m/%d %H:%M:%S",
-    level=logging.INFO,
-)
 logger = logging.getLogger(__name__)
 
 parser = ArgumentParser()
@@ -23,7 +19,7 @@ parser.add_argument(
     "--output_dir",
     help="Path to output directory",
     type=str,
-    default="./datasets/imcrts/",
+    default=IMCRTS_DEFAULT_DIR,
 )
 
 parser.add_argument(
@@ -42,13 +38,15 @@ parser.add_argument(
 
 args = parser.parse_args()
 if args.key is None:
-    api_key = os.environ.get("PDP_KEY")
+    api_key = PDP_KEY
 else:
     api_key = load_key(args.key)
 
-IMCRTSCollector(
+collector = IMCRTSCollector(
     key=api_key,
     start_date=args.start_date,
     end_date=args.end_date,
-    output_dir=args.output_dir,
-).collect()
+)
+collector.collect()
+collector.to_pickle(args.output_dir)
+collector.to_excel(args.output_dir)

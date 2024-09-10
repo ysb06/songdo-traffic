@@ -5,3 +5,4 @@ logging.basicConfig(
     datefmt="%Y/%m/%d %H:%M:%S",
     level=logging.INFO,
 )
+logger = logging.getLogger(__name__)

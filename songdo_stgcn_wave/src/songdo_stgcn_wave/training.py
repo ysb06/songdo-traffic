@@ -23,7 +23,7 @@ from stgcn_wave.utils import evaluate_metric, evaluate_model
 from wandb import Config
 
 from .utils import HyperParams, get_auto_device, fix_seed
-from metr.components.adj_mx import import_adj_mx
+from metr.components.adj_mx import AdjacencyMatrix
 from metr.dataloader import MetrDataset
 from .test import evaluate_model_
 
@@ -45,7 +45,7 @@ def train_new(config: HyperParams):
 
     fix_seed(config.seed)
 
-    adj_mx_raw = import_adj_mx(config.adj_mx_filepath)
+    adj_mx_raw = AdjacencyMatrix.import_from_pickle(config.adj_mx_filepath)
     sparse_mx = sp.coo_matrix(adj_mx_raw.adj_mx)
     G = dgl.from_scipy(sparse_mx)
     G = G.to(training_device)
