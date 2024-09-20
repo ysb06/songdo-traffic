@@ -10,6 +10,11 @@ class ZscoreOutlierProcessor(OutlierProcessor):
         self.threshold = threshold
 
     def process(self, df: pd.DataFrame) -> pd.DataFrame:
-        pass
-    # Todo: Implement ZscoreOutlierProcessor
+        mean = df.mean()
+        std = df.std()
+        z_scores = (df - mean) / std
+        outliers = z_scores > self.threshold
+        df_clean = df.mask(outliers)
+
+        return df_clean
     # Todo: Complete Components

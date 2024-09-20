@@ -24,7 +24,6 @@ class TrafficData:
         self.__raw = raw
         self.__raw.sort_index(inplace=True)
         self.__raw = self.__raw.asfreq(pd.infer_freq(self.__raw.index))
-        self.missings = self.__raw.isna()
         self.__verify_data()
         self.reset_data()
 
@@ -39,6 +38,12 @@ class TrafficData:
         self.__sensor_filter = self.data.columns.to_list()
         self.__start_time = self.data.index.min()
         self.__end_time = self.data.index.max()
+    
+    @property
+    def is_missing_values(self) -> pd.DataFrame:
+        missings = self.__raw.isna()
+        new_sensor_ids = self.__raw.columns.intersection(self.__sensor_filter)
+        return missings[new_sensor_ids].copy()
 
     @property
     def sensor_filter(self) -> list[str]:
@@ -46,8 +51,14 @@ class TrafficData:
 
     @sensor_filter.setter
     def sensor_filter(self, sensor_ids: list[str]) -> None:
-        self.__sensor_filter = sensor_ids
-        self.data = self.data[sensor_ids]
+        missing_sensors = set(sensor_ids) - set(self.__raw.columns)
+        if missing_sensors:
+            logger.warning(
+                f"The following sensors do not exist in the data:\r\n{', '.join(missing_sensors)}"
+            )
+        new_sensor_ids = self.__raw.columns.intersection(sensor_ids)
+        self.__sensor_filter = new_sensor_ids
+        self.data = self.__raw[new_sensor_ids].copy()
 
     @property
     def start_time(self) -> pd.Timestamp:
@@ -67,7 +78,7 @@ class TrafficData:
         self.__end_time = pd.Timestamp(end_time)
         self.data = self.data.loc[: self.__end_time]
 
-    def delete_outliers(self, processor: OutlierProcessor) -> None:
+    def remove_outliers(self, processor: OutlierProcessor) -> None:
         logger.info("Process Outlier for METR-IMC Traffic data...")
         self.data = processor.process(self.data)
         logger.info("Processing Complete")
@@ -84,14 +95,3 @@ class TrafficData:
         else:
             self.data.to_hdf(filepath)
         logger.info("Saving Complete")
-
-    def export_all(self, dir_path: str, filename_prefix: str = "metr-imc") -> None:
-        logger.info(f"Exporting all data to {dir_path}...")
-        traffic_data_path = os.path.join(dir_path, f"{filename_prefix}.h5")
-        missing_data_path = os.path.join(dir_path, f"{filename_prefix}-missing.h5")
-        raw_data_path = os.path.join(dir_path, f"{filename_prefix}-raw.h5")
-
-        self.data.to_hdf(traffic_data_path)
-        self.missings.to_hdf(missing_data_path)
-        self.__raw.to_hdf(raw_data_path)
-        logger.info("Exporting Complete")
