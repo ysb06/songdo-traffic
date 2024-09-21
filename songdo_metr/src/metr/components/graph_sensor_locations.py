@@ -38,8 +38,7 @@ class SensorLocations:
         self._sensor_filter = new_sensor_ids
         self.data = self._raw[self._raw["sensor_id"].isin(new_sensor_ids)].copy()
 
-    def to_csv(self, dir_path: str, filename: str = "sensor_locations.csv") -> None:
-        filepath = os.path.join(dir_path, filename)
+    def to_csv(self, filepath: str) -> None:
         logger.info(f"Saving data to {filepath}...")
         self.data.to_csv(filepath)
         logger.info("Saving Complete")

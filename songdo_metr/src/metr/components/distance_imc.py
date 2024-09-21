@@ -37,8 +37,7 @@ class DistancesImc:
             self._raw["from"].isin(new_sensor_ids) & self._raw["to"].isin(new_sensor_ids)
         ].copy()
 
-    def to_csv(self, dir_path: str, filename: str = "distance_imc_2024.csv") -> None:
-        filepath = os.path.join(dir_path, filename)
+    def to_csv(self, filepath: str) -> None:
         logger.info(f"Saving data to {filepath}...")
         self.data.to_csv(filepath, index=False)
         logger.info("Saving Complete")

@@ -80,9 +80,8 @@ class AdjacencyMatrix:
     def data_exists(self) -> bool:
         return self.__raw is not None
 
-    def to_pickle(self, dir_path: str, filename: str = "adj_mx.pkl") -> None:
-        file_path = os.path.join(dir_path, filename)
-        logger.info(f"Saving data to {file_path}...")
-        with open(file_path, "wb") as f:
+    def to_pickle(self, filepath: str) -> None:
+        logger.info(f"Saving data to {filepath}...")
+        with open(filepath, "wb") as f:
             pickle.dump(self.__raw, f)
         logger.info("Saving Complete")

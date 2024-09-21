@@ -63,9 +63,9 @@ class MetrSubset:
         adj_mx_path = os.path.join(output_dir, self.adj_mx_filename)
         missings_path = os.path.join(output_dir, missings_filename)
 
-        self.metr_imc.to_hdf(metr_imc_path)
+        self.metr_imc.to_hdf(metr_imc_path, key="data")
         self.metr_ids.to_txt(metr_ids_path)
         self.graph_sensor_locations.to_csv(graph_sensor_loc_path)
         self.distances_imc.to_csv(distances_imc_path)
         self.adj_mx.to_pickle(adj_mx_path)
-        self.metr_imc.is_missing_values.to_hdf(missings_path)
+        self.metr_imc.is_missing_values.to_hdf(missings_path, key="data")
