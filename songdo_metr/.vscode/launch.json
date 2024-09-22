@@ -6,6 +6,14 @@
 	"version": "0.2.0",
 	"configurations": [
 		{
+			"name": "Run Test",
+			"type": "debugpy",
+			"request": "launch",
+			"module": "pytest",
+			"console": "integratedTerminal",
+			"args": ["-s"]
+		},
+		{
 			"name": "Generate METR-IMC",
 			"type": "debugpy",
 			"request": "launch",

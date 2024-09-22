@@ -12,3 +12,8 @@ def target_dir():
 def selected_road_path():
     return "../datasets/metr-imc-subsets/selected_road.shp"
 
+@pytest.fixture
+def comparison_target():
+    return "../datasets/metr-imc-subsets/selected_road.shp"
+
+
