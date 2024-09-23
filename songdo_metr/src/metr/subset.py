@@ -4,7 +4,9 @@ from .components.metr_ids import IdList
 from .components.graph_sensor_locations import SensorLocations
 from .components.distance_imc import DistancesImc
 from .components.adj_mx import AdjacencyMatrix
+import logging
 
+logger = logging.getLogger(__name__)
 
 class MetrSubset:
     def __init__(
@@ -55,6 +57,7 @@ class MetrSubset:
         self,
         output_dir: str,
         missings_filename: str = "metr-imc-missings.h5",
+        miscellaneous: bool = True,
     ) -> None:
         metr_imc_path = os.path.join(output_dir, self.metr_imc_filename)
         metr_ids_path = os.path.join(output_dir, self.metr_ids_filename)
@@ -68,4 +71,17 @@ class MetrSubset:
         self.graph_sensor_locations.to_csv(graph_sensor_loc_path)
         self.distances_imc.to_csv(distances_imc_path)
         self.adj_mx.to_pickle(adj_mx_path)
+        logger.info(f"Exporting MVs to {missings_path}...")
         self.metr_imc.is_missing_values.to_hdf(missings_path, key="data")
+        
+        if miscellaneous:
+            data_excel_path = metr_imc_path.replace(".h5", ".xlsx")
+            missings_excel_path = missings_path.replace(".h5", ".xlsx")
+            original_excel_path = metr_imc_path.replace(".h5", "-raw.xlsx")
+
+            logger.info("Exporting Data to Excel...")
+            self.metr_imc.to_excel(data_excel_path)
+            logger.info(f"Exporting MVs to {missings_excel_path}...")
+            self.metr_imc.is_missing_values.to_excel(missings_excel_path)
+            logger.info(f"Exporting raw to {original_excel_path}...")
+            self.metr_imc.original_data.to_excel(original_excel_path)

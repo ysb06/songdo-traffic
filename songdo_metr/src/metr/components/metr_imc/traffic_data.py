@@ -2,6 +2,7 @@ import logging
 import os
 from typing import Optional, Union
 
+import numpy as np
 import pandas as pd
 from pandas.tseries.offsets import DateOffset
 
@@ -77,6 +78,10 @@ class TrafficData:
     def end_time(self, end_time: Union[str, pd.Timestamp]) -> None:
         self.__end_time = pd.Timestamp(end_time)
         self.data = self.data.loc[: self.__end_time]
+    
+    @property
+    def original_data(self) -> pd.DataFrame:
+        return self.__raw.copy()[self.__sensor_filter].loc[self.__start_time:self.__end_time]
 
     def remove_outliers(self, processor: OutlierProcessor) -> None:
         logger.info("Process Outlier for METR-IMC Traffic data...")
@@ -87,6 +92,30 @@ class TrafficData:
         logger.info("Interpolating METR-IMC Traffic data...")
         self.data = interpolator.interpolate(self.data)
         logger.info("Interplating Complete")
+    
+    def remove_weird_zero(self) -> None:
+        """Remove zeros around missing values
+        """
+        def extend_nans_around_zeros(series: pd.Series) -> pd.Series:
+            series = series.copy()
+            nan_indices = series[series.isna()].index
+
+            for idx in nan_indices:
+                idx_pos = series.index.get_loc(idx)
+
+                i = idx_pos - 1
+                while i >= 0 and series.iat[i] == 0:
+                    series.iat[i] = np.nan
+                    i -= 1
+
+                i = idx_pos + 1
+                while i < len(series) and series.iat[i] == 0:
+                    series.iat[i] = np.nan
+                    i += 1
+
+            return series
+        
+        self.data = self.data.apply(extend_nans_around_zeros)
 
     def to_hdf(self, filepath: str, key: Optional[str] = None) -> None:
         logger.info(f"Saving data to {filepath}...")
@@ -94,4 +123,9 @@ class TrafficData:
             self.data.to_hdf(filepath, key=key)
         else:
             self.data.to_hdf(filepath)
+        logger.info("Saving Complete")
+    
+    def to_excel(self, filepath: str) -> None:
+        logger.info(f"Saving data to {filepath}...")
+        self.data.to_excel(filepath)
         logger.info("Saving Complete")

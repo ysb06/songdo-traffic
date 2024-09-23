@@ -26,6 +26,7 @@ class TimeMeanFillInterpolator(Interpolator):
             ].fillna(mean_value)
 
         return s_filled
+        # 기존의 값이 이상한 부분이 있었다. 현재가 정확할 수 있다
 
     def interpolate(self, df: pd.DataFrame) -> pd.DataFrame:
         result = df.apply(self.__fill_na_with_same_time, axis=0)
