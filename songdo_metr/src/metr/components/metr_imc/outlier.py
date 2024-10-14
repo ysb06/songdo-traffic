@@ -1,19 +1,54 @@
 import numpy as np
 import pandas as pd
+import scipy.stats as stats
 
 
 class OutlierProcessor:
-    def process(self, df: pd.DataFrame) -> pd.DataFrame:
+    def _process(self, df: pd.DataFrame) -> pd.DataFrame:
         raise NotImplementedError
+    
+    def process(self, df: pd.DataFrame) -> pd.DataFrame:
+        original_count = df.count()
+        df_clean = self._process(df)
+        clean_count = df_clean.count()
+        print(f"Outliers removed: {original_count - clean_count}")
 
-class ZscoreOutlierProcessor(OutlierProcessor):
+        return df_clean
+
+
+class AbsoluteOutlierProcessor(OutlierProcessor):
+    def __init__(self, threshold: float) -> None:
+        self.threshold = threshold
+
+    def _process(self, df: pd.DataFrame) -> pd.DataFrame:
+        df_clean = df.mask(np.abs(df) > self.threshold)
+        return df_clean
+
+
+class HourlyInSensorOutlierProcessor(OutlierProcessor):
+    def __init__(self, threshold: float = 3.5) -> None:
+        self.threshold = threshold
+
+    def _process(self, df: pd.DataFrame) -> pd.DataFrame:
+        return df.apply(self._apply_threshold_to_series)
+
+    def _apply_threshold_to_series(self, series: pd.Series) -> pd.Series:
+        z_scores = stats.zscore(series, nan_policy='omit')
+        series[np.abs(z_scores) > self.threshold] = np.nan
+        
+        return series
+
+
+class HourlyZscoreOutlierProcessor(OutlierProcessor):
     def __init__(self, threshold: float = 3.0) -> None:
         self.threshold = threshold
-    
-    def __detect_outliers_zscore_df(self, df: pd.DataFrame, threshold=3) -> pd.DataFrame:
+
+    def _detect_outliers_zscore_df(
+        self, df: pd.DataFrame, threshold=3
+    ) -> pd.DataFrame:
         # 시간대 별로 데이터를 그룹화하여 z-score 계산
         outliers = pd.DataFrame(index=df.index, columns=df.columns, dtype=bool)
-        
+
         info = []
         for hour in range(24):
             hourly_data: pd.DataFrame = df[df.index.hour == hour]
@@ -23,13 +58,15 @@ class ZscoreOutlierProcessor(OutlierProcessor):
             z_scores = (hourly_data - mean) / std
 
             outliers.loc[hourly_data.index] = np.abs(z_scores) > threshold
-            info.append({
-                "hour": hour,
-                "mean": mean,
-                "std": std,
-                "threshold": threshold,
-                "outlier_threshold": mean + threshold * std
-            })
+            info.append(
+                {
+                    "hour": hour,
+                    "mean": mean,
+                    "std": std,
+                    "threshold": threshold,
+                    "outlier_threshold": mean + threshold * std,
+                }
+            )
 
         outliers = outliers.convert_dtypes()
         dtypes = outliers.dtypes.unique()
@@ -37,9 +74,10 @@ class ZscoreOutlierProcessor(OutlierProcessor):
             print("Warning: Different data types detected in the outlier dataframe.")
         return outliers, info
 
-    def process(self, df: pd.DataFrame) -> pd.DataFrame:
-        outliers, _ = self.__detect_outliers_zscore_df(df, self.threshold)
+    def _process(self, df: pd.DataFrame) -> pd.DataFrame:
+        outliers, _ = self._detect_outliers_zscore_df(df, self.threshold)
         df_clean = df.mask(outliers)
 
         return df_clean
+
     # Todo: Complete Components

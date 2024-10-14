@@ -92,13 +92,12 @@ class MetrImc:
         traffic_data: pd.DataFrame,
         road_data: gpd.GeoDataFrame,
         remove_empty: bool = True,
+        sort_index: bool = True,
     ) -> None:
         road_ids = list(set(road_data["LINK_ID"]) & set(traffic_data["linkID"]))
 
         logger.info("Converting traffic data to METR format...")
         converted_dict, missing_links = self.__convert_raw_data(traffic_data, road_ids)
-        # Todo: converted_dict가 제대로 변환되었는지 확인 필요
-        # 정상적이라면 missing_links는 빈 리스트가 되어야 함, 이미 road_ids에서 처리를 했으므로...
 
         if missing_links:
             logger.warning(
@@ -106,8 +105,10 @@ class MetrImc:
             )
             print(missing_links[:5] + ["..."])
 
-        self.data = pd.DataFrame(converted_dict, dtype=np.float32)
+        self.data = pd.DataFrame(converted_dict, dtype=np.float64)
         logger.info(f"Data Size: {self.data.shape[0]}")
+        if sort_index:
+            self.data.sort_index(inplace=True)
         if remove_empty:
             self.data = self.data.loc[:, self.notna_road_ids]
 

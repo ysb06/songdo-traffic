@@ -10,7 +10,7 @@ from metr.dataset.interpolator import Interpolator
 from .converter.metr_imc import MetrImc
 from .converter.adj_mx import AdjacencyMatrix
 from .converter.distance_imc import DistancesImc
-from .converter.graph_sensor_locations import GraphSensorLocations
+from .converter.graph_sensor_locations import GraphSensorLocations, SensorView
 from .converter.metr_ids import MetrIds
 
 logger = logging.getLogger(__name__)
@@ -44,6 +44,8 @@ class MetrImcDatasetGenerator:
         logger.info("graph_sensor_locations.csv")
         sensor_loc = GraphSensorLocations(self.road_gdf, metr_imc.road_ids)
         sensor_loc.to_csv(output_dir)
+        sensor_view = SensorView(os.path.join(output_dir, "graph_sensor_locations.csv"))
+        sensor_view.export_to_file(os.path.join(output_dir, "miscellaneous"))
 
         logger.info("distances_imc_2024.csv")
         distances_imc = DistancesImc(

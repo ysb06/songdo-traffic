@@ -11,7 +11,7 @@
 			"request": "launch",
 			"module": "pytest",
 			"console": "integratedTerminal",
-			"args": ["-s"]
+			"args": ["-s", "tests/test_metadata_generation.py"]
 		},
 		{
 			"name": "Generate METR-IMC",
