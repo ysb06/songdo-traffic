@@ -142,7 +142,7 @@ class TrafficData:
         if key is not None:
             self.data.to_hdf(filepath, key=key)
         else:
-            self.data.to_hdf(filepath)
+            self.data.to_hdf(filepath, key="data")
         logger.info("Saving Complete")
 
     def to_excel(self, filepath: str) -> None:

@@ -1,0 +1,14 @@
+raw_dir: ../datasets/metr-imc
+selected_node_path: ../datasets/metr-imc/miscellaneous/selected_nodes.shp
+misc_dir: ../datasets/metr-imc/miscellaneous
+out_root_dir: ../output/metr-imc-selected
+outlier_out_dir: ../output/metr-imc-selected/outliers
+# filenames
+traffic_data_filename: metr-imc.h5
+traffic_training_data_filename: metr-imc-training.h5
+traffic_test_data_filename: metr-imc-test.h5
+metadata_filename: metadata.h5
+adj_mx_filename: adj_mx.pkl
+distances_filename: distances_imc_2024.csv
+ids_filename: metr_ids.txt
+sensor_locations_filename: graph_sensor_locations.csv

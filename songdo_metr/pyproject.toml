@@ -14,6 +14,10 @@ dependencies = [
     "tqdm>=4.66.4",
     "tables>=3.9.2",
     "numpy~=1.26.4",
+    "pyyaml>=6.0.2",
+    "folium>=0.17.0",
+    "matplotlib>=3.9.2",
+    "mapclassify>=2.8.1",
 ]
 requires-python = "==3.11.*"
 readme = "README.md"
