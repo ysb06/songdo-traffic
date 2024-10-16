@@ -10,7 +10,6 @@ from metr.components import (
     DistancesImc,
 )
 import geopandas as gpd
-import matplotlib.pyplot as plt
 from folium.folium import Map
 
 

@@ -1,3 +1,4 @@
+from typing import Dict
 import numpy as np
 import pandas as pd
 import scipy.stats as stats
@@ -6,17 +7,17 @@ import scipy.stats as stats
 class OutlierProcessor:
     def _process(self, df: pd.DataFrame) -> pd.DataFrame:
         raise NotImplementedError
-    
+
     def process(self, df: pd.DataFrame) -> pd.DataFrame:
         original_count = df.count()
         df_clean = self._process(df)
         clean_count = df_clean.count()
-        print(f"Outliers removed: {original_count - clean_count}")
+        print(f"Outliers removed: {(original_count - clean_count).sum()}")
 
         return df_clean
 
 
-class AbsoluteOutlierProcessor(OutlierProcessor):
+class SimpleAbsoluteOutlierProcessor(OutlierProcessor):
     def __init__(self, threshold: float) -> None:
         self.threshold = threshold
 
@@ -25,28 +26,67 @@ class AbsoluteOutlierProcessor(OutlierProcessor):
         return df_clean
 
 
-class HourlyInSensorOutlierProcessor(OutlierProcessor):
-    def __init__(self, threshold: float = 3.5) -> None:
+class TrafficCapacityAbsoluteOutlierProcessor:
+    def __init__(
+        self,
+        road_speed_limits: Dict[str, int],
+        lane_counts: Dict[str, int],
+        adjustment_rate: float = 1.0,
+    ) -> None:
+        self.road_speed_limits = road_speed_limits
+        self.lane_counts = lane_counts
+        self.adjustment_rate = adjustment_rate
+
+    def _get_road_capacity(self, road_name: str) -> float:
+        speed_limit = self.road_speed_limits[road_name]
+        lane_count = self.lane_counts[road_name]
+        # 이상적인 허용 용량 계산 (2200 - 10 * (100 - 속도제한)) * 차선 수 * 비율
+        return (2200 - 10 * (100 - speed_limit)) * lane_count * self.adjustment_rate
+
+    def _process_road_data(self, series: pd.Series) -> pd.Series:
+        road_name = series.name
+        road_capacity = self._get_road_capacity(road_name)
+        return series.mask(series > road_capacity)
+
+    def process(self, df: pd.DataFrame) -> pd.DataFrame:
+        return df.apply(self._process_road_data)
+
+
+class SimpleZscoreOutlierProcessor:
+    def __init__(self, threshold: float = 5) -> None:
+        self.threshold = threshold
+
+    def _detect_outliers_zscore(self, df: pd.DataFrame) -> pd.DataFrame:
+        z_scores = stats.zscore(df, nan_policy="omit")
+        outliers = np.abs(z_scores) > self.threshold
+        return outliers
+
+    def process(self, df: pd.DataFrame) -> pd.DataFrame:
+        outliers = self._detect_outliers_zscore(df)
+        df_clean = df.mask(outliers)
+        return df_clean
+
+
+class HourlyInSensorZscoreOutlierProcessor(OutlierProcessor):
+    def __init__(self, threshold: float = 5) -> None:
         self.threshold = threshold
 
     def _process(self, df: pd.DataFrame) -> pd.DataFrame:
         return df.apply(self._apply_threshold_to_series)
 
     def _apply_threshold_to_series(self, series: pd.Series) -> pd.Series:
-        z_scores = stats.zscore(series, nan_policy='omit')
+        z_scores = stats.zscore(series, nan_policy="omit")
         series[np.abs(z_scores) > self.threshold] = np.nan
-        
+
         return series
 
 
 class HourlyZscoreOutlierProcessor(OutlierProcessor):
-    def __init__(self, threshold: float = 3.0) -> None:
+    def __init__(self, threshold: float = 5) -> None:
         self.threshold = threshold
 
-    def _detect_outliers_zscore_df(
-        self, df: pd.DataFrame, threshold=3
-    ) -> pd.DataFrame:
-        # 시간대 별로 데이터를 그룹화하여 z-score 계산
+    def _detect_outliers_zscore_df(self, df: pd.DataFrame, threshold=5) -> pd.DataFrame:
+        """시간대 별로 데이터를 그룹화하여 z-score 계산"""
         outliers = pd.DataFrame(index=df.index, columns=df.columns, dtype=bool)
 
         info = []
