@@ -22,13 +22,15 @@ class AdjacencyMatrix:
         id_list: IdList, distances_imc: DistancesImc, normalized_k=0.1
     ) -> "AdjacencyMatrix":
         def get_adjacency_matrix(
-            distance_df: pd.DataFrame, sensor_ids: List[str], normalized_k: float
+            distance_df: pd.DataFrame,
+            sensor_ids: List[str],
+            normalized_k: float,
         ):
             num_sensors = len(sensor_ids)
             dist_mx = np.zeros((num_sensors, num_sensors), dtype=np.float32)
             dist_mx[:] = np.inf
 
-            sensor_id_to_index = {}  # Builds sensor id to index map.
+            sensor_id_to_index: Dict[str, int] = {}  # Builds sensor id to index map.
             for i, sensor_id in enumerate(sensor_ids):
                 sensor_id_to_index[sensor_id] = i
 
@@ -43,7 +45,7 @@ class AdjacencyMatrix:
             # Calculates the standard deviation as theta.
             distances = dist_mx[~np.isinf(dist_mx)].flatten()
             std = distances.std()
-            adj_mx = np.exp(-np.square(dist_mx / std))
+            adj_mx: np.ndarray = np.exp(-np.square(dist_mx / std))
             # Make the adjacent matrix symmetric by taking the max.
             # adj_mx = np.maximum.reduce([adj_mx, adj_mx.T])
 
@@ -62,26 +64,26 @@ class AdjacencyMatrix:
     def __init__(
         self, raw_ids: List[str], raw_id_map: Dict[str, int], raw_adj_mx: np.ndarray
     ) -> None:
-        self.__raw = (raw_ids, raw_id_map, raw_adj_mx)
+        self._raw = (raw_ids, raw_id_map, raw_adj_mx)
 
     @property
     def sensor_ids(self) -> List[str]:
-        return self.__raw[0]
+        return self._raw[0]
 
     @property
     def sensor_id_to_idx(self) -> Dict[str, int]:
-        return self.__raw[1]
+        return self._raw[1]
 
     @property
     def adj_mx(self) -> np.ndarray:
-        return self.__raw[2]
+        return self._raw[2]
 
     @property
     def data_exists(self) -> bool:
-        return self.__raw is not None
+        return self._raw is not None
 
     def to_pickle(self, filepath: str) -> None:
         logger.info(f"Saving data to {filepath}...")
         with open(filepath, "wb") as f:
-            pickle.dump(self.__raw, f)
+            pickle.dump(self._raw, f)
         logger.info("Saving Complete")

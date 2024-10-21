@@ -1,3 +1,11 @@
+raw_data_dir: ../output/metr-imc-selected
 loading_target_dir: ../output/metr-imc-selected/outliers_removed
 output_dir: ../output/metr-imc-selected/interpolated
 missing_allow_rate: 0.1
+# filenames
+traffic_data_filename: metr-imc.h5
+metadata_filename: metadata.h5
+adj_mx_filename: adj_mx.pkl
+distances_filename: distances_imc_2024.csv
+ids_filename: metr_ids.txt
+sensor_locations_filename: graph_sensor_locations.csv

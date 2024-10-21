@@ -9,9 +9,17 @@ from dataclasses import dataclass
 
 @dataclass
 class Configs:
+    raw_data_dir: str
     loading_target_dir: str
     output_dir: str
     missing_allow_rate: float
+    # filenames
+    traffic_data_filename: str
+    metadata_filename: str
+    adj_mx_filename: str
+    distances_filename: str
+    ids_filename: str
+    sensor_locations_filename: str
 
 
 def load_configs():
@@ -39,7 +47,7 @@ def traffic_data_list():
     target_dir = raw_config.loading_target_dir
     files = glob.glob(os.path.join(target_dir, "*.h5"))
     files.sort()
-    print(files)
+    print("Files:", files)
     result = []
     for file_path in files:
         result.append(TrafficData.import_from_hdf(file_path))
@@ -52,7 +60,7 @@ def traffic_data_filename_list():
     target_dir = raw_config.loading_target_dir
     files = glob.glob(os.path.join(target_dir, "*.h5"))
     files.sort()
-    print(files)
+    print("Names:", files)
     result = []
     for file_path in files:
         result.append(os.path.basename(file_path))

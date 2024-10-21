@@ -48,3 +48,14 @@ This directory includes research conducted using the sub-projects, utilizing Jup
 이 프로젝트에는 여러 개의 하위 프로젝트로 이루어져 있으며 서로 다른 개별의 라이선스를 가지고 있으므로 이 프로젝트 활용 시 각각의 내용을 반드시 확인 및 검토하십시오. 기본적으로 각 하위 프로젝트의 라이선스 독립을 위해 하위 프로젝트 간 직접적인 참조는 현재도 그리고 앞으로도 하지 않습니다. 다만, 각 하위 프로젝트의 결과물을 참조하는 형태로 간접적으로 연결될 수 있습니다.
 
 This project consists of several sub-projects, each with its own license. Please be sure to review and confirm the license terms before using any part of this project. To maintain the independence of each sub-project’s license, there are no direct references between sub-projects, now or in the future. However, indirect connections may occur by referencing the outputs of each sub-project.
+
+## References
+
+### Data
+
+1. 국가교통정보센터 표준노드링크 (국토교통부)
+  - https://www.its.go.kr/
+  - https://www.its.go.kr/nodelink/nodelinkRef
+
+2. 인천시 교통량 데이터
+  - https://www.data.go.kr/data/15113145/openapi.do
