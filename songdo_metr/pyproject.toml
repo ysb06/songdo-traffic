@@ -18,6 +18,7 @@ dependencies = [
     "folium>=0.17.0",
     "matplotlib>=3.9.2",
     "mapclassify>=2.8.1",
+    "pytest-ordering>=0.6",
 ]
 requires-python = "==3.11.*"
 readme = "README.md"

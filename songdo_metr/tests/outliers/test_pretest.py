@@ -11,8 +11,10 @@ from metr.components import (
 )
 import geopandas as gpd
 from folium.folium import Map
+import pytest
 
 
+@pytest.mark.run(order=1)
 def test_path(configs: Configs):
     raw_traffic_data_path = os.path.join(configs.raw_dir, configs.traffic_data_filename)
     raw_metadata_path = os.path.join(configs.raw_dir, configs.metadata_filename)
@@ -31,6 +33,7 @@ def test_path(configs: Configs):
     assert os.path.exists(raw_sensor_locations_path)
 
 
+@pytest.mark.run(order=2)
 def test_import(configs: Configs):
     raw_traffic_data_path = os.path.join(configs.raw_dir, configs.traffic_data_filename)
     raw_metadata_path = os.path.join(configs.raw_dir, configs.metadata_filename)
@@ -44,8 +47,11 @@ def test_import(configs: Configs):
     map.save(map_output_path)
 
 
+@pytest.mark.run(order=3)
 def test_selected_subsets_generation(configs: Configs):
-    raw_traffic_data_path = os.path.join(configs.raw_dir, configs.traffic_training_data_filename)
+    raw_traffic_data_path = os.path.join(
+        configs.raw_dir, configs.traffic_training_data_filename
+    )
     raw_metadata_path = os.path.join(configs.raw_dir, configs.metadata_filename)
     raw_sensor_locations_path = os.path.join(
         configs.raw_dir, configs.sensor_locations_filename
@@ -65,12 +71,20 @@ def test_selected_subsets_generation(configs: Configs):
     sensor_locs.sensor_filter = metr_ids.data
     dist_imc.sensor_filter = metr_ids.data
     adj_mx = AdjacencyMatrix.import_from_components(metr_ids, dist_imc)
-    
-    selected_traffic_data_path = os.path.join(configs.out_root_dir, configs.traffic_training_data_filename) 
-    selected_metadata_path = os.path.join(configs.out_root_dir, configs.metadata_filename)
+
+    selected_traffic_data_path = os.path.join(
+        configs.out_root_dir, configs.traffic_training_data_filename
+    )
+    selected_metadata_path = os.path.join(
+        configs.out_root_dir, configs.metadata_filename
+    )
     selected_metr_ids_path = os.path.join(configs.out_root_dir, configs.ids_filename)
-    selected_sensor_locations_path = os.path.join(configs.out_root_dir, configs.sensor_locations_filename)
-    selected_distances_path = os.path.join(configs.out_root_dir, configs.distances_filename)
+    selected_sensor_locations_path = os.path.join(
+        configs.out_root_dir, configs.sensor_locations_filename
+    )
+    selected_distances_path = os.path.join(
+        configs.out_root_dir, configs.distances_filename
+    )
     selected_adj_mx_path = os.path.join(configs.out_root_dir, configs.adj_mx_filename)
 
     metr_imc.to_hdf(selected_traffic_data_path)
@@ -80,12 +94,17 @@ def test_selected_subsets_generation(configs: Configs):
     dist_imc.to_csv(selected_distances_path)
     adj_mx.to_pickle(selected_adj_mx_path)
 
+
+@pytest.mark.run(order=4)
 def test_test_subset_generation(configs: Configs):
-    raw_traffic_data_path = os.path.join(configs.raw_dir, configs.traffic_test_data_filename)
-    test_traffic_data_path = os.path.join(configs.out_root_dir, configs.traffic_test_data_filename)
+    raw_traffic_data_path = os.path.join(
+        configs.raw_dir, configs.traffic_test_data_filename
+    )
+    test_traffic_data_path = os.path.join(
+        configs.out_root_dir, configs.traffic_test_data_filename
+    )
 
     metr_imc = TrafficData.import_from_hdf(raw_traffic_data_path)
     metr_imc.to_hdf(test_traffic_data_path)
 
     # 이것은 테스트의 raw파일이고 실제 테스트를 위해서는 생성된 Subset의 교집합으로 별도의 테스트셋을 생성해야함
-

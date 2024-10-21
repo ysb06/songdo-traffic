@@ -1,0 +1,3 @@
+loading_target_dir: ../output/metr-imc-selected/outliers_removed
+output_dir: ../output/metr-imc-selected/interpolated
+missing_allow_rate: 0.1

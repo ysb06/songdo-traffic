@@ -6,12 +6,20 @@
 	"version": "0.2.0",
 	"configurations": [
 		{
-			"name": "Run Test",
+			"name": "Run missings Test",
 			"type": "debugpy",
 			"request": "launch",
 			"module": "pytest",
 			"console": "integratedTerminal",
-			"args": ["-s", "tests/outliers/test_outlier_generation.py"]
+			"args": ["-s", "tests/missings"]
+		},
+		{
+			"name": "Run outlier Test",
+			"type": "debugpy",
+			"request": "launch",
+			"module": "pytest",
+			"console": "integratedTerminal",
+			"args": ["-s", "tests/outliers"]
 		},
 		{
 			"name": "Generate METR-IMC",

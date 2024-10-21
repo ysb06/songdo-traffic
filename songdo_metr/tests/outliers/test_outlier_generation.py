@@ -20,8 +20,10 @@ from metr.components.metr_imc.outlier import (
     SimpleZscoreOutlierProcessor,
     HourlyInSensorZscoreOutlierProcessor,
 )
+import pytest
 
 
+@pytest.mark.run(order=5)
 def test_simple_absolute_outlier(
     selected_training_traffic_data: TrafficData,
     outlier_output_path: Dict[str, str],
@@ -32,6 +34,7 @@ def test_simple_absolute_outlier(
     selected_training_traffic_data.to_hdf(outlier_output_path["simple_absolute"])
 
 
+@pytest.mark.run(order=5)
 def test_traffic_capacity_absolute_outlier(
     selected_training_traffic_data: TrafficData,
     road_metadata: Metadata,
@@ -47,6 +50,7 @@ def test_traffic_capacity_absolute_outlier(
     )
 
 
+@pytest.mark.run(order=5)
 def test_simple_zscore_outlier(
     selected_training_traffic_data: TrafficData,
     outlier_output_path: Dict[str, str],
@@ -61,6 +65,7 @@ def test_simple_zscore_outlier(
     selected_training_traffic_data.to_hdf(outlier_output_path["simple_zscore"])
 
 
+@pytest.mark.run(order=5)
 def test_hourly_zscore_outlier(
     selected_training_traffic_data: TrafficData,
     outlier_output_path: Dict[str, str],
@@ -74,6 +79,7 @@ def test_hourly_zscore_outlier(
     selected_training_traffic_data.to_hdf(outlier_output_path["hourly_zscore"])
 
 
+@pytest.mark.run(order=5)
 def test_hourly_in_sensor_zscore_outlier(
     selected_training_traffic_data: TrafficData,
     outlier_output_path: Dict[str, str],
