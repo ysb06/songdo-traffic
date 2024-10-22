@@ -55,6 +55,7 @@ def test_generating_full_dataset(
     output_dir: str,
     configs: Configs,
 ):
+    output_dir = os.path.join(output_dir, "time_mean_avg")
     folder_list = [
         folder
         for folder in os.listdir(output_dir)
@@ -65,7 +66,6 @@ def test_generating_full_dataset(
 
     for folder_path in folder_paths:
         traffic_filepath = os.path.join(folder_path, configs.traffic_data_filename)
-        traffic_missing_filepath = os.path.join(folder_path, configs.traffic_missing_data_filename)
         metadata_filepath = os.path.join(raw_data_dir, configs.metadata_filename)
         distances_filepath = os.path.join(raw_data_dir, configs.distances_filename)
         sensor_locations_filepath = os.path.join(
@@ -73,7 +73,6 @@ def test_generating_full_dataset(
         )
 
         traffic_data = TrafficData.import_from_hdf(traffic_filepath)
-        traffic_missing_data = pd.read_hdf(traffic_missing_filepath)
         id_list = IdList(traffic_data.data.columns.to_list())
         metadata = Metadata.import_from_hdf(metadata_filepath)
         metadata.sensor_filter = id_list.data

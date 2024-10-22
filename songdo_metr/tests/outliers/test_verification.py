@@ -6,6 +6,7 @@ from scipy import stats
 
 from metr.components.metadata import Metadata
 from metr.components.metr_imc.traffic_data import TrafficData
+from metr.components.metr_imc.outlier import RemovingWeirdZeroOutlierProcessor
 
 
 # 원본과 처리된 데이터를 불러오는 함수
@@ -20,6 +21,7 @@ def test_verify_simple_absolute_outlier(
     outlier_output_path: Dict[str, str],
     threshold: float = 8000,
 ):
+    selected_training_traffic_data.remove_outliers(RemovingWeirdZeroOutlierProcessor())
     original_df = selected_training_traffic_data.data
     processed_df = pd.read_hdf(outlier_output_path["simple_absolute"])
 
@@ -39,6 +41,7 @@ def test_verify_traffic_capacity_outlier(
     road_metadata: Metadata,
     outlier_output_path: Dict[str, str],
 ):
+    selected_training_traffic_data.remove_outliers(RemovingWeirdZeroOutlierProcessor())
     original_df = selected_training_traffic_data.data
     processed_df = pd.read_hdf(outlier_output_path["traffic_capacity_absolute"])
 
@@ -69,6 +72,7 @@ def test_verify_simple_zscore_outlier(
     outlier_output_path: Dict[str, str],
     threshold: float = 5.0,
 ):
+    selected_training_traffic_data.remove_outliers(RemovingWeirdZeroOutlierProcessor())
     original_df = selected_training_traffic_data.data
     processed_df = pd.read_hdf(outlier_output_path["simple_zscore"])
 
@@ -94,6 +98,7 @@ def test_verify_hourly_zscore_outlier(
     outlier_output_path: Dict[str, str],
     threshold: float = 5.0,
 ):
+    selected_training_traffic_data.remove_outliers(RemovingWeirdZeroOutlierProcessor())
     original_df = selected_training_traffic_data.data
     processed_df = pd.read_hdf(outlier_output_path["hourly_zscore"])
 
@@ -119,7 +124,7 @@ def test_verify_hourly_in_sensor_zscore_outlier(
     outlier_output_path: Dict[str, str],
     threshold: float = 5.0,
 ):
-    threshold: float = 5.0
+    selected_training_traffic_data.remove_outliers(RemovingWeirdZeroOutlierProcessor())
     original_df = selected_training_traffic_data.data
     processed_df = pd.read_hdf(outlier_output_path["hourly_in_sensor_zscore"])
 
