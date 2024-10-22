@@ -4,6 +4,7 @@ output_dir: ../output/metr-imc-selected/interpolated
 missing_allow_rate: 0.1
 # filenames
 traffic_data_filename: metr-imc.h5
+traffic_missing_data_filename: metr-imc-missings.h5
 metadata_filename: metadata.h5
 adj_mx_filename: adj_mx.pkl
 distances_filename: distances_imc_2024.csv

@@ -5,10 +5,10 @@ epochs: 50
 num_layers: 9
 window: 144
 dataset_name: METR-IMC
-sensorsfilepath: ../datasets/metr-imc/metr_ids.txt
-disfilepath: ../datasets/metr-imc/distances_imc_2023.csv
-tsfilepath: ../datasets/metr-imc/metr-imc.h5
-savemodelpath: output/stgcnwavemodel.pt
+sensorsfilepath: ../datasets/metr-imc/subsets/metr-1-cleaned/metr_ids.txt
+disfilepath: ../datasets/metr-imc/subsets/metr-1-cleaned/distances_imc_2023.csv
+tsfilepath: ../datasets/metr-imc/subsets/metr-1-cleaned/metr-imc.h5
+savemodelpath: output/stgcnwavemodel_1.pt
 pred_len: 5
 control_str: TNTSTNTST
 channels:
@@ -19,3 +19,12 @@ channels:
   - 32
   - 128
 seed: 42
+# Extra Parameters
+adj_mx_filepath: ../datasets/metr-imc/subsets/metr-1-cleaned/adj_mx.pkl
+missing_labels_filepath: ../datasets/metr-imc/subsets/metr-1-cleaned/metr-imc-extra.h5
+train_ratio: 0.7
+valid_ratio: 0.1
+drop_rate: 0
+scheduler:
+  step_size: 5
+  gamma: 0.7

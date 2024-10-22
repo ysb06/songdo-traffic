@@ -14,6 +14,7 @@ from metr.components import (
 )
 from metr.components.metr_imc.interpolation import TimeMeanFillInterpolator
 from tests.missings.conftest import Configs
+import pandas as pd
 
 print("test_interpolation started")
 
@@ -25,6 +26,7 @@ def test_time_mean_interpolation(
     configs: Configs,
 ):
     target_filename = configs.traffic_data_filename
+    target_missing_filename = configs.traffic_missing_data_filename
 
     for traffic_data, tr_data_filename in zip(traffic_data_list, traffic_data_filename_list):
         data = traffic_data.data
@@ -37,14 +39,19 @@ def test_time_mean_interpolation(
 
         traffic_data.data = good_data
         traffic_data.interpolate(TimeMeanFillInterpolator())
-        file_dir = os.path.join(output_dir, "time_mean_avg",Path(tr_data_filename).stem)
-        filepath = os.path.join(file_dir, target_filename)
+        file_dir = os.path.join(output_dir, "time_mean_avg", Path(tr_data_filename).stem)
+        traffic_filepath = os.path.join(file_dir, target_filename)
+        missing_filepath = os.path.join(file_dir, target_missing_filename)
         os.makedirs(file_dir, exist_ok=True)
-        traffic_data.to_hdf(filepath)
-        print(f"Interpolated data saved to {filepath}")
+
+        traffic_data.to_hdf(traffic_filepath)
+        missings_data = traffic_data.missings_info
+        missings_data.to_hdf(missing_filepath, key="data")
+
+        print(f"Interpolated data saved to {file_dir}")
 
 
-def test_finishing(
+def test_generating_full_dataset(
     output_dir: str,
     configs: Configs,
 ):
@@ -56,8 +63,9 @@ def test_finishing(
     folder_paths = [os.path.join(output_dir, folder) for folder in folder_list]
     raw_data_dir = configs.raw_data_dir
 
-    for foler_path in folder_paths:
-        traffic_filepath = os.path.join(foler_path, configs.traffic_data_filename)
+    for folder_path in folder_paths:
+        traffic_filepath = os.path.join(folder_path, configs.traffic_data_filename)
+        traffic_missing_filepath = os.path.join(folder_path, configs.traffic_missing_data_filename)
         metadata_filepath = os.path.join(raw_data_dir, configs.metadata_filename)
         distances_filepath = os.path.join(raw_data_dir, configs.distances_filename)
         sensor_locations_filepath = os.path.join(
@@ -65,6 +73,7 @@ def test_finishing(
         )
 
         traffic_data = TrafficData.import_from_hdf(traffic_filepath)
+        traffic_missing_data = pd.read_hdf(traffic_missing_filepath)
         id_list = IdList(traffic_data.data.columns.to_list())
         metadata = Metadata.import_from_hdf(metadata_filepath)
         metadata.sensor_filter = id_list.data
@@ -74,10 +83,10 @@ def test_finishing(
         sensor_locations.sensor_filter = id_list.data
         adj_mx: AdjacencyMatrix = AdjacencyMatrix.import_from_components(id_list, distances)
 
-        id_list.to_txt(os.path.join(foler_path, configs.ids_filename))
-        metadata.to_hdf(os.path.join(foler_path, configs.metadata_filename))
-        distances.to_csv(os.path.join(foler_path, configs.distances_filename))
+        id_list.to_txt(os.path.join(folder_path, configs.ids_filename))
+        metadata.to_hdf(os.path.join(folder_path, configs.metadata_filename))
+        distances.to_csv(os.path.join(folder_path, configs.distances_filename))
         sensor_locations.to_csv(
-            os.path.join(foler_path, configs.sensor_locations_filename)
+            os.path.join(folder_path, configs.sensor_locations_filename)
         )
-        adj_mx.to_pickle(os.path.join(foler_path, configs.adj_mx_filename))
+        adj_mx.to_pickle(os.path.join(folder_path, configs.adj_mx_filename))

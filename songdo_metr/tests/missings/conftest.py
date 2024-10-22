@@ -15,6 +15,7 @@ class Configs:
     missing_allow_rate: float
     # filenames
     traffic_data_filename: str
+    traffic_missing_data_filename: str
     metadata_filename: str
     adj_mx_filename: str
     distances_filename: str

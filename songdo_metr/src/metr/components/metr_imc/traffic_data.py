@@ -55,7 +55,7 @@ class TrafficData:
         self.__end_time = self.data.index.max()
 
     @property
-    def is_missing_values(self) -> pd.DataFrame:
+    def missings_info(self) -> pd.DataFrame:
         missings = self._raw.isna()
         new_sensor_ids = self._raw.columns.intersection(self._sensor_filter)
         return missings[new_sensor_ids].copy()
@@ -113,36 +113,9 @@ class TrafficData:
         self.data = interpolator.interpolate(self.data)
         logger.info("Interplating Complete")
 
-    def remove_weird_zero(self) -> None:
-        """Remove zeros around missing values"""
-
-        def extend_nans_around_zeros(series: pd.Series) -> pd.Series:
-            series = series.copy()
-            nan_indices = series[series.isna()].index
-
-            for idx in nan_indices:
-                idx_pos = series.index.get_loc(idx)
-
-                i = idx_pos - 1
-                while i >= 0 and series.iat[i] == 0:
-                    series.iat[i] = np.nan
-                    i -= 1
-
-                i = idx_pos + 1
-                while i < len(series) and series.iat[i] == 0:
-                    series.iat[i] = np.nan
-                    i += 1
-
-            return series
-
-        self.data = self.data.apply(extend_nans_around_zeros)
-
-    def to_hdf(self, filepath: str, key: Optional[str] = None) -> None:
+    def to_hdf(self, filepath: str, key: str = "data") -> None:
         logger.info(f"Saving data to {filepath}...")
-        if key is not None:
-            self.data.to_hdf(filepath, key=key)
-        else:
-            self.data.to_hdf(filepath, key="data")
+        self.data.to_hdf(filepath, key=key)
         logger.info("Saving Complete")
 
     def to_excel(self, filepath: str) -> None:

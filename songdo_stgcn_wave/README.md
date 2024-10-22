@@ -6,36 +6,11 @@ This project aims to create a traffic volume prediction model for Incheon City b
 
 ## Get Started for training model
 
-### Installing Requirements
+### Installation
 
-First, you need to update dgl submodule.
-
-``` bash
-git submodule update
-```
-
-#### Using PDM
-
-```bash
-pdm install
-```
-
-#### Not Using PDM
-
-```bash
-pip install -r requirements.txt
-```
-
-### Setting Environment Variables
-
-```bash
-export PYTHONPATH="./src"
-```
-
-Alternatively, you can create a .env file in the project folder with the following content:
 
 ```
-PYTHONPATH="./src"
+pip install .
 ```
 
 ### Running the Code

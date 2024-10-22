@@ -22,7 +22,7 @@ from .utils import HyperParams, fix_seed, get_auto_device
 logger = logging.getLogger(__name__)
 
 
-def train_new(config: HyperParams):
+def train(config: HyperParams):
     run_name = (
         f"{config.dataset_name}_STGCN_WAVE_{datetime.now().strftime('%y%m%d_%H%M%S')}"
     )
