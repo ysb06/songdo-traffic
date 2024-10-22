@@ -169,4 +169,5 @@ cython_debug/
 datasets/*
 !datasets/*/README*
 output/*
+wandb/
 

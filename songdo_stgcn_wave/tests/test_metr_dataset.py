@@ -4,7 +4,7 @@ from metr.dataloader import MetrDataset
 from sklearn.preprocessing import StandardScaler
 from torch.utils.data import DataLoader, TensorDataset
 
-from songdo_stgcn_wave.utils import HyperParams, get_config
+from songdo_stgcn_trainer.utils import HyperParams, get_config
 from stgcn_wave.load_data import data_transform
 
 

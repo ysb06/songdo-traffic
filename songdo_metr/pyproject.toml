@@ -1,33 +1,36 @@
 [project]
 name = "songdo_metr"
-version = "0.1.0"
+version = "0.1.1"
 description = "Default template for PDM package"
-authors = [{ name = "Seungbin Yim", email = "ysb06@hotmail.com" }]
-dependencies = [
-    "torch<=2.3.0",
-    "torchvision<=0.18.0",
-    "torchaudio<=2.3.0",
-    "scikit-learn>=1.5.1",
-    "openpyxl>=3.1.5",
-    "requests>=2.32.3",
-    "geopandas>=1.0.1",
-    "tqdm>=4.66.4",
-    "tables>=3.9.2",
-    "numpy~=1.26.4",
-    "pyyaml>=6.0.2",
-    "folium>=0.17.0",
-    "matplotlib>=3.9.2",
-    "mapclassify>=2.8.1",
-    "pytest-ordering>=0.6",
+authors = [
+    {name = "sbyim", email = "ysb06@hotmail.com"},
 ]
-requires-python = ">=3.10.*"
+dependencies = [
+    "geopandas>=1.0.1",
+    "pyyaml>=6.0.2",
+    "pandas>=2.2.3",
+    "scikit-learn>=1.5.2",
+    "numpy>=2.1.2",
+    "scipy>=1.14.1",
+    "tqdm>=4.66.5",
+    "shapely>=2.0.6",
+    "networkx>=3.4.2",
+    "requests>=2.32.3",
+    "torch>=2.0.0",
+]
+requires-python = ">=3.10"
 readme = "README.md"
-license = { text = "MIT" }
+license = {text = "MIT"}
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
 
 [tool.pdm]
-distribution = false
+distribution = true
 
 [tool.pdm.dev-dependencies]
-dev = [
+test = [
     "pytest>=8.3.3",
+    "seaborn>=0.13.2",
 ]
