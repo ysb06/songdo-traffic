@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 import pandas as pd
 
-from stgcn_wave.model import STGCN_WAVE
+from .model import STGCN_WAVE
 
 from .utils import HyperParams, get_auto_device, fix_seed
 from metr.components.adj_mx import import_adj_mx
