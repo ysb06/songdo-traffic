@@ -18,11 +18,14 @@ This project aims to create a traffic volume prediction model for Incheon City b
 
 3. Install desired PyTorch and DGL
 
-    Example for DGL 2.4.0 and PyTorch 2.4.0 with CUDA 12.1 with Linux:
+    Example for DGL 2.4.0 with CUDA 12.1 with Linux:
     ```
-    pip install dgl -f https://data.dgl.ai/wheels/torch-2.4/cu121/repo.html
-    pip install torch==2.4.0 torchvision==0.19.0 torchaudio==2.4.0 --index-url https://download.pytorch.org/whl/cu121
+    pip install dgl==2.4.0 -f https://data.dgl.ai/wheels/torch-2.4/cu121/repo.html
+    pip install torch==2.4.1 torchvision==0.19.1 torchaudio==2.4.1 --index-url https://download.pytorch.org/whl/cu121
     ```
+    Note 1: DGL 2.4.0 is only compatible with PyTorch 2.4.0 and 2.4.1
+    
+    Note 2: When you install desired DGL, you must specify the version like dgl==2.4.0 to upgrade from basically installed DGL.
 
 자세한 설치는 다음 사이트를 참고하세요:
 - https://pytorch.org/get-started/locally/
