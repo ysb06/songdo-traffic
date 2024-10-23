@@ -10,13 +10,7 @@ This project aims to create a traffic volume prediction model for Incheon City b
 
 1. Move to workspace root folder
 
-2. Install "songdo_metr" and this project
-    ```
-    pip install ./songdo_metr
-    pip install ./songdo_stgcn_wave
-    ```
-
-3. Install desired PyTorch and DGL
+2. Install desired PyTorch and DGL
 
     Example for DGL 2.4.0 with CUDA 12.1 with Linux:
     ```
@@ -26,6 +20,12 @@ This project aims to create a traffic volume prediction model for Incheon City b
     Note 1: DGL 2.4.0 is only compatible with PyTorch 2.4.0 and 2.4.1
     
     Note 2: When you install desired DGL, you must specify the version like dgl==2.4.0 to upgrade from basically installed DGL.
+
+3. Install "songdo_metr" and this project
+    ```
+    pip install ./songdo_metr
+    pip install ./songdo_stgcn_wave
+    ```
 
 자세한 설치는 다음 사이트를 참고하세요:
 - https://pytorch.org/get-started/locally/

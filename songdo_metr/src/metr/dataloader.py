@@ -20,7 +20,7 @@ class MetrDataset(Dataset):
             pd.read_hdf(data_path),
             history_len,
             prediction_len,
-            pd.read_hdf(missing_value_path, key="missing") if missing_value_path else None,
+            pd.read_hdf(missing_value_path) if missing_value_path else None,
         )
 
     @staticmethod
