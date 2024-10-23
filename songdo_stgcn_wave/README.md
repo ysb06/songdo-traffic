@@ -8,15 +8,31 @@ This project aims to create a traffic volume prediction model for Incheon City b
 
 ### Installation
 
+1. Move to workspace root folder
 
-```
-pip install .
-```
+2. Install "songdo_metr" and this project
+    ```
+    pip install ./songdo_metr
+    pip install ./songdo_stgcn_wave
+    ```
+
+3. Install desired PyTorch and DGL
+
+    Example for DGL 2.4.0 and PyTorch 2.4.1 with CUDA 12.1 with Linux:
+    ```
+    pip install pip install torch==2.4.1 torchvision==0.19.1 torchaudio==2.4.1 --index-url https://download.pytorch.org/whl/cu121
+    pip install dgl -f https://data.dgl.ai/wheels/torch-2.4/cu121/repo.html
+    
+    ```
+
+자세한 설치는 다음 사이트를 참고하세요:
+- https://pytorch.org/get-started/locally/
+- https://www.dgl.ai/pages/start.html
 
 ### Running the Code
 
 ```bash
-python -m songdo_stgcn_wave --config imc-base
+python -m songdo_stgcn_trainer --config imc-base
 ```
 
 코드를 실행하면 config 매개변수에 지정된 이름의 configs 폴더 내 yaml파일을 읽습니다. config 매개변수가 없을 경우 무조건 base.yaml을 읽습니다. 이 config는 원래 이 STGCN 모델 코드의 소스에서 지정한 하이퍼파라미터와 같은 값을 가지고 있습니다.

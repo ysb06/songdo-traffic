@@ -15,7 +15,7 @@ import pandas as pd
 from .model import STGCN_WAVE
 
 from .utils import HyperParams, get_auto_device, fix_seed
-from metr.components.adj_mx import import_adj_mx
+from metr.components.adj_mx import AdjacencyMatrix
 from metr.dataloader import MetrDataset
 
 logger = logging.getLogger(__name__)
@@ -25,7 +25,7 @@ def test_model(config: HyperParams):
     logger.info(f"Test for {config.dataset_name}")
     test_device = get_auto_device()
     fix_seed(config.seed)
-    adj_mx_raw = import_adj_mx(config.adj_mx_filepath)
+    adj_mx_raw = AdjacencyMatrix.import_from_pickle(config.adj_mx_filepath)
     sparse_mx = sp.coo_matrix(adj_mx_raw.adj_mx)
     G = dgl.from_scipy(sparse_mx)
     G = G.to(test_device)

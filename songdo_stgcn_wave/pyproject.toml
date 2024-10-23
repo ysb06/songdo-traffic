@@ -6,10 +6,9 @@ authors = [
     {name = "sbyim", email = "ysb06@hotmail.com"},
 ]
 dependencies = [
-    "torch==2.4.1",
-    "torchvision==0.19.1",
-    "torchaudio==2.4.1",
+    "torch>=2",
     "wandb>=0.18.5",
+    "dgl<=2.2.0",
 ]
 requires-python = ">=3.10"
 readme = "README.md"
@@ -27,15 +26,3 @@ distribution = true
 dev = [
     "-e file:///${PROJECT_ROOT}/../songdo_metr#egg=songdo-metr",
 ]
-
-[tool.pdm.resolution]
-respect-source-order = true
-
-[[tool.pdm.source]]
-name = "pytorch"
-url = "https://download.pytorch.org/whl/cu124"
-include_packages = ["torch", "torchvision", "torchaudio"]
-
-[[tool.pdm.source]]
-name = "pypi"
-url = "https://pypi.org/simple"
