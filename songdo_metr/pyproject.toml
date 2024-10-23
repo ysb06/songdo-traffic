@@ -14,7 +14,7 @@ dependencies = [
     "scipy>=1.7",
     "tqdm>=4.66.5",
     "shapely>=2.0.6",
-    "networkx>=3.4.2",
+    "networkx>=3.4",
     "requests>=2.32.3",
     "torch>=2",
 ]
