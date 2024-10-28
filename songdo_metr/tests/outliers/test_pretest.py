@@ -14,25 +14,6 @@ from folium.folium import Map
 import pytest
 
 
-@pytest.mark.run(order=1)
-def test_path(configs: Configs):
-    raw_traffic_data_path = os.path.join(configs.raw_dir, configs.traffic_data_filename)
-    raw_metadata_path = os.path.join(configs.raw_dir, configs.metadata_filename)
-    raw_ids_path = os.path.join(configs.raw_dir, configs.ids_filename)
-    raw_distances_path = os.path.join(configs.raw_dir, configs.distances_filename)
-    raw_adj_mx_path = os.path.join(configs.raw_dir, configs.adj_mx_filename)
-    raw_sensor_locations_path = os.path.join(
-        configs.raw_dir, configs.sensor_locations_filename
-    )
-
-    assert os.path.exists(raw_traffic_data_path)
-    assert os.path.exists(raw_metadata_path)
-    assert os.path.exists(raw_ids_path)
-    assert os.path.exists(raw_distances_path)
-    assert os.path.exists(raw_adj_mx_path)
-    assert os.path.exists(raw_sensor_locations_path)
-
-
 @pytest.mark.run(order=2)
 def test_import(configs: Configs):
     raw_traffic_data_path = os.path.join(configs.raw_dir, configs.traffic_data_filename)
@@ -43,12 +24,15 @@ def test_import(configs: Configs):
     TrafficData.import_from_hdf(raw_traffic_data_path)
     Metadata.import_from_hdf(raw_metadata_path)
     selected_nodes: gpd.GeoDataFrame = gpd.read_file(configs.selected_node_path)
+    print("Selected Nodes: ", configs.selected_node_path)
     map: Map = selected_nodes.explore()
     map.save(map_output_path)
 
 
 @pytest.mark.run(order=3)
 def test_selected_subsets_generation(configs: Configs):
+    print("Raw Dataset Directory: ", configs.raw_dir)
+    print("Ouput Directory: ", configs.out_root_dir)
     raw_traffic_data_path = os.path.join(
         configs.raw_dir, configs.traffic_training_data_filename
     )

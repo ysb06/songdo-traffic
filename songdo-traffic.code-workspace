@@ -13,12 +13,11 @@
 			"path": "songdo_metr"
 		},
 		{
-			"name": "songdo_qgis",
-			"path": "songdo_qgis"
-		},
-		{
 			"name": "songdo_stgcn_wave",
 			"path": "songdo_stgcn_wave"
+		},
+		{
+			"path": "songdo_arima"
 		}
 	],
 	"settings": {

@@ -1,6 +1,6 @@
-raw_data_dir: ../output/metr-imc-selected
-loading_target_dir: ../output/metr-imc-selected/outliers_removed
-output_dir: ../output/metr-imc-selected/interpolated
+raw_data_dir: ../output/metr-imc-small
+loading_target_dir: ../output/metr-imc-small/outliers_removed
+output_dir: ../output/metr-imc-small/interpolated
 missing_allow_rate: 0.1
 # filenames
 traffic_data_filename: metr-imc.h5

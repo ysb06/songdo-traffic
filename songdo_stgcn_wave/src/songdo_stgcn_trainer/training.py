@@ -169,7 +169,6 @@ def _validate_model(
     loss_sum = 0.0
     with torch.no_grad():
         for x, y in tqdm(dataloader):
-            # Todo: Check if missing_value is correctly handled
             x: Tensor = x.to(device)
             y: Tensor = y.to(device)
             y_pred: Tensor = model(x)

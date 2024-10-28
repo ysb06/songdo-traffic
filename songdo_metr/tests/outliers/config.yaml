@@ -1,8 +1,8 @@
 raw_dir: ../datasets/metr-imc
-selected_node_path: ../datasets/metr-imc/miscellaneous/selected_nodes.shp
+selected_node_path: ../output/metr-imc-small/miscellaneous/selected-small.shp
 misc_dir: ../datasets/metr-imc/miscellaneous
-out_root_dir: ../output/metr-imc-selected
-outlier_out_dir: ../output/metr-imc-selected/outliers_removed
+out_root_dir: ../output/metr-imc-small
+outlier_out_dir: ../output/metr-imc-small/outliers_removed
 # filenames
 traffic_data_filename: metr-imc.h5
 traffic_training_data_filename: metr-imc-training.h5

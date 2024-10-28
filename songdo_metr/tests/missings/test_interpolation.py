@@ -1,4 +1,3 @@
-import glob
 import os
 from typing import List
 from pathlib import Path
@@ -14,7 +13,6 @@ from metr.components import (
 )
 from metr.components.metr_imc.interpolation import TimeMeanFillInterpolator
 from tests.missings.conftest import Configs
-import pandas as pd
 
 print("test_interpolation started")
 
@@ -33,11 +31,11 @@ def test_time_mean_interpolation(
         missing_allow_count = int(data.shape[0] * configs.missing_allow_rate)
         print(target_filename, ":")
         missing_counts = data.isna().sum()
-        good_columns = missing_counts[missing_counts <= missing_allow_count].index
-        good_data = data[good_columns]
-        print(data.shape, "->", good_data.shape)
+        # Remove columns with too many missing values
+        good_columns = missing_counts[missing_counts <= missing_allow_count].index.to_list()
+        traffic_data.sensor_filter = good_columns
+        print(traffic_data._raw.shape, "->", traffic_data.data.shape)
 
-        traffic_data.data = good_data
         traffic_data.interpolate(TimeMeanFillInterpolator())
         file_dir = os.path.join(output_dir, "time_mean_avg", Path(tr_data_filename).stem)
         traffic_filepath = os.path.join(file_dir, target_filename)
@@ -48,6 +46,8 @@ def test_time_mean_interpolation(
         missings_data = traffic_data.missings_info
         missings_data.to_hdf(missing_filepath, key="data")
 
+        print(f"Traffic Data: {traffic_data.data.shape}")
+        print(f"Missing Data: {missings_data.shape}")
         print(f"Interpolated data saved to {file_dir}")
 
 
