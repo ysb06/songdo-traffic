@@ -1,0 +1,13 @@
+{
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"name": "Run ARIMA Training",
+			"type": "debugpy",
+			"request": "launch",
+			"module": "pytest",
+			"console": "integratedTerminal",
+			"args": ["-s", "tests/test_test_arima.py"]
+		},
+	]
+}
