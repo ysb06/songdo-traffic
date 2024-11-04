@@ -1,6 +1,7 @@
 p_max: 5
 d_max: 4
 q_max: 5
+training_data_ratio: 0.8
 traffic_training_data_path: "../output/metr-imc-small/interpolated/time_mean_avg/metr-imc-01-absolute-simple/metr-imc.h5"
 traffic_test_data_path: "../output/metr-imc-small/metr-imc-test.h5"
 output_root_dir: "./output/arima-01-absolute_simple-time_mean"

@@ -11,6 +11,7 @@ class HyperParams:
     p_max: int
     d_max: int
     q_max: int
+    training_data_ratio: float
     traffic_training_data_path: str
     traffic_test_data_path: str
     output_root_dir: str

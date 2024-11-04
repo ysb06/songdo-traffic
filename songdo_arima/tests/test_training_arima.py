@@ -1,4 +1,4 @@
-from songdo_arima.simple_training import train
+from songdo_arima.sarimax_training import train
 from songdo_arima.utils import HyperParams
 
 

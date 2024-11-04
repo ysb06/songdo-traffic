@@ -7,7 +7,7 @@
 			"request": "launch",
 			"module": "pytest",
 			"console": "integratedTerminal",
-			"args": ["-s", "tests/test_test_arima.py"]
+			"args": ["-s", "tests/test_training_arima.py"]
 		},
 	]
 }
