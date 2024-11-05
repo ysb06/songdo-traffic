@@ -1,15 +1,17 @@
 import os
 import pickle
+from dataclasses import asdict
 
 import pandas as pd
+import yaml
+# 병렬 처리를 위한 라이브러리 임포트
+from joblib import Parallel, delayed
 from metr.components import TrafficData
-from pmdarima import auto_arima, ARIMA
-from sklearn.metrics import mean_absolute_error
+from pmdarima import ARIMA, auto_arima
+from sklearn.metrics import mean_absolute_error, root_mean_squared_error
 
 from songdo_arima.utils import HyperParams
-
-import yaml
-from dataclasses import asdict
+from tqdm import tqdm
 
 
 class BestARIMA:
@@ -17,8 +19,7 @@ class BestARIMA:
         self.best_model = model
         self.result = {}
 
-
-def train(config: HyperParams):
+def train(config: HyperParams) -> dict:
     output_dir = config.output_root_dir
     model_output_dir = os.path.join(output_dir, "models")
     os.makedirs(model_output_dir, exist_ok=True)
@@ -30,36 +31,40 @@ def train(config: HyperParams):
     train_data = raw_data.iloc[:train_size, :]
     valid_data = raw_data.iloc[train_size:, :]
 
-    for column in raw_data.columns:
-        train_target = train_data[column]
-        valid_target = valid_data[column]
-        model, mae = train_sensor(train_target, valid_target)
+    # 병렬 연산을 통해 각 센서에 대한 모델 학습
+    results = Parallel(n_jobs=2)(
+        delayed(train_sensor)(train_data[column], valid_data[column], model_output_dir)
+        for column in tqdm(raw_data.columns)
+    )
 
-        best_result = BestARIMA(model)
-        best_result.result["MAE"] = mae
+    # MAE와 RMSE의 합계 및 개수 계산
+    mae_sum = sum(mae for mae, _ in results)
+    rmse_sum = sum(rmse for _, rmse in results)
+    mae_count = len(results)
+    rmse_count = len(results)
 
-        # 모델 저장
-        model_output_path = os.path.join(model_output_dir, f"{column}.pkl")
-        with open(model_output_path, "wb") as pkl:
-            pickle.dump(best_result, pkl)
-
-    config_output_path = os.path.join(model_output_dir, "hyperparams.yaml")
+    config_output_path = os.path.join(model_output_dir, "results.yaml")
     config_dict = asdict(config)
     config_dict["data_shape"] = raw_data.shape
     config_dict["train_size"] = train_size
     config_dict["valid_size"] = data_size - train_size
+    config_dict["mean_MAE"] = mae_sum / mae_count
+    config_dict["mean_RMSE"] = rmse_sum / rmse_count
+
     with open(config_output_path, "w") as f:
         yaml.dump(config_dict, f)
 
+    return config_dict
 
-def train_sensor(train_data: pd.Series, valid_data: pd.Series):
+
+def train_sensor(train_data: pd.Series, valid_data: pd.Series, model_output_dir: str):
     # auto_arima 모델 학습
     model: ARIMA = auto_arima(
         train_data,
         start_p=0,
         max_p=3,
         start_q=0,
-        max_q=2,
+        max_q=3,
         d=None,  # 'd' 값을 자동으로 결정
         start_P=0,
         max_P=1,
@@ -71,7 +76,7 @@ def train_sensor(train_data: pd.Series, valid_data: pd.Series):
         stepwise=True,  # 스텝와이즈 알고리즘 사용으로 계산 시간 단축
         suppress_warnings=True,
         error_action="ignore",
-        trace=True,  # 진행 상황을 보려면 True로 설정
+        trace=False,  # 진행 상황을 보려면 True로 설정
     )
 
     # 검증 데이터에 대한 예측
@@ -79,8 +84,18 @@ def train_sensor(train_data: pd.Series, valid_data: pd.Series):
     forecast = model.predict(n_periods=n_periods)
     forecast = pd.Series(forecast, index=valid_data.index)
 
-    # MAE 계산
+    # MAE 및 RMSE 계산
     mae = mean_absolute_error(valid_data, forecast)
-    print(f"Auto ARIMA 모델 MAE: {mae}")
+    rmse = root_mean_squared_error(valid_data, forecast)
+    print(f"센서 {train_data.name}의 Auto ARIMA 모델{model.get_params()} MAE: {mae}")
 
-    return model, mae
+    best_result = BestARIMA(model)
+    best_result.result["MAE"] = mae
+    best_result.result["RMSE"] = rmse
+
+    # 모델 저장
+    model_output_path = os.path.join(model_output_dir, f"{train_data.name}.pkl")
+    with open(model_output_path, "wb") as pkl:
+        pickle.dump(best_result, pkl)
+
+    return mae, rmse

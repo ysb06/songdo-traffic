@@ -3,4 +3,7 @@ from songdo_arima.utils import HyperParams
 
 
 def test_arima(configs: HyperParams):
-    train(configs)
+    result = train(configs)
+    print("-"*50)
+    print("MAE Result:", result["mean_MAE"])
+    print("RMSE Result:", result["mean_RMSE"])
