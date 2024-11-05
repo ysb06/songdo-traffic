@@ -1,26 +1,13 @@
+import glob
 import os
+from pathlib import Path
+from typing import Dict, List, Tuple, Union
+
 import pytest
 import yaml
+
 from metr.components import TrafficData
-import glob
-from typing import List
-from dataclasses import dataclass
-
-
-@dataclass
-class Configs:
-    raw_data_dir: str
-    loading_target_dir: str
-    output_dir: str
-    missing_allow_rate: float
-    # filenames
-    traffic_data_filename: str
-    traffic_missing_data_filename: str
-    metadata_filename: str
-    adj_mx_filename: str
-    distances_filename: str
-    ids_filename: str
-    sensor_locations_filename: str
+from metr.components.metr_imc.interpolation import TimeMeanFillInterpolator
 
 
 def load_configs():
@@ -29,13 +16,10 @@ def load_configs():
     with open(yaml_path, "r") as f:
         config = yaml.safe_load(f)
 
-    print(config)
-    config = Configs(**config)
-
     return config
 
 
-raw_config = load_configs()
+raw_config: Dict[str, Union[str, int, float]] = load_configs()
 
 
 @pytest.fixture
@@ -44,35 +28,45 @@ def configs():
 
 
 @pytest.fixture
-def traffic_data_list():
-    target_dir = raw_config.loading_target_dir
+def traffic_dataset():
+    target_dir = raw_config["loading_target_dir"]
     files = glob.glob(os.path.join(target_dir, "*.h5"))
     files.sort()
-    print("Files:", files)
-    result = []
+
+    result: List[Tuple[str, str, TrafficData]] = []
     for file_path in files:
-        result.append(TrafficData.import_from_hdf(file_path))
+        path = file_path
+        name = Path(os.path.basename(file_path)).stem
+        data = TrafficData.import_from_hdf(file_path)
+
+        result.append((path, name, data))
 
     return result
 
 
 @pytest.fixture
-def traffic_data_filename_list():
-    target_dir = raw_config.loading_target_dir
-    files = glob.glob(os.path.join(target_dir, "*.h5"))
-    files.sort()
-    print("Names:", files)
-    result = []
-    for file_path in files:
-        result.append(os.path.basename(file_path))
+def output_root_dir():
+    return raw_config["output_dir"]
 
-    return result
-
-
-@pytest.fixture
-def output_dir():
-    return raw_config.output_dir
 
 @pytest.fixture
 def missing_allow_rate():
-    return raw_config.missing_allow_rate
+    return raw_config["missing_allow_rate"]
+
+
+@pytest.fixture
+def output_traffic_filename():
+    return raw_config["traffic_data_filename"]
+
+
+@pytest.fixture
+def output_missing_filename():
+    return raw_config["traffic_missing_data_filename"]
+
+@pytest.fixture
+def interpolators():
+    return [TimeMeanFillInterpolator()]
+
+@pytest.fixture
+def interpolation_root_dirs():
+    return ["time_mean_avg"]
