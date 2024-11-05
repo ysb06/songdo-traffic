@@ -11,11 +11,16 @@ from metr.components import (
     IdList,
     SensorLocations,
 )
-from metr.components.metr_imc.interpolation import TimeMeanFillInterpolator
+from metr.components.metr_imc.interpolation import (
+    TimeMeanFillInterpolator,
+    Interpolator,
+)
 from tests.missings.conftest import Configs
 
 print("test_interpolation started")
 
+def test_interpolation():
+    pass
 
 def test_time_mean_interpolation(
     traffic_data_list: List[TrafficData],
@@ -26,18 +31,17 @@ def test_time_mean_interpolation(
     target_filename = configs.traffic_data_filename
     target_missing_filename = configs.traffic_missing_data_filename
 
-    for traffic_data, tr_data_filename in zip(traffic_data_list, traffic_data_filename_list):
-        data = traffic_data.data
-        missing_allow_count = int(data.shape[0] * configs.missing_allow_rate)
+    root_dir = os.path.join(output_dir, "time_mean_avg")
+    for traffic_data, tr_data_filename in zip(
+        traffic_data_list, traffic_data_filename_list
+    ):
         print(target_filename, ":")
-        missing_counts = data.isna().sum()
-        # Remove columns with too many missing values
-        good_columns = missing_counts[missing_counts <= missing_allow_count].index.to_list()
-        traffic_data.sensor_filter = good_columns
+        interpolator = TimeMeanFillInterpolator()
+
+        traffic_data = interpolate_traffic_data(traffic_data, interpolator)
         print(traffic_data._raw.shape, "->", traffic_data.data.shape)
 
-        traffic_data.interpolate(TimeMeanFillInterpolator())
-        file_dir = os.path.join(output_dir, "time_mean_avg", Path(tr_data_filename).stem)
+        file_dir = os.path.join(root_dir, Path(tr_data_filename).stem)
         traffic_filepath = os.path.join(file_dir, target_filename)
         missing_filepath = os.path.join(file_dir, target_missing_filename)
         os.makedirs(file_dir, exist_ok=True)
@@ -49,6 +53,23 @@ def test_time_mean_interpolation(
         print(f"Traffic Data: {traffic_data.data.shape}")
         print(f"Missing Data: {missings_data.shape}")
         print(f"Interpolated data saved to {file_dir}")
+
+
+def interpolate_traffic_data(
+    traffic_data: TrafficData,
+    interpolator: Interpolator,
+    missing_allow_rate: float = 0.1,
+):
+    data = traffic_data.data
+    missing_allow_count = int(data.shape[0] * missing_allow_rate)
+    missing_counts = data.isna().sum()
+    # Remove columns with too many missing values
+    good_columns = missing_counts[missing_counts <= missing_allow_count].index.to_list()
+    traffic_data.sensor_filter = good_columns
+
+    traffic_data.interpolate(interpolator)
+
+    return traffic_data
 
 
 def test_generating_full_dataset(
@@ -80,7 +101,9 @@ def test_generating_full_dataset(
         distances.sensor_filter = id_list.data
         sensor_locations = SensorLocations.import_from_csv(sensor_locations_filepath)
         sensor_locations.sensor_filter = id_list.data
-        adj_mx: AdjacencyMatrix = AdjacencyMatrix.import_from_components(id_list, distances)
+        adj_mx: AdjacencyMatrix = AdjacencyMatrix.import_from_components(
+            id_list, distances
+        )
 
         id_list.to_txt(os.path.join(folder_path, configs.ids_filename))
         metadata.to_hdf(os.path.join(folder_path, configs.metadata_filename))
