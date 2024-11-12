@@ -41,7 +41,7 @@ class RemovingWeirdZeroOutlierProcessor(OutlierProcessor):
         return df.apply(extend_nans_around_zeros)
 
 class SimpleAbsoluteOutlierProcessor(OutlierProcessor):
-    def __init__(self, threshold: float) -> None:
+    def __init__(self, threshold: float = 8000) -> None:
         self.threshold = threshold
 
     def _process(self, df: pd.DataFrame) -> pd.DataFrame:

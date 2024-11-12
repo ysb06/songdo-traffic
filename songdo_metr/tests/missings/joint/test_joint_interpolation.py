@@ -11,14 +11,9 @@ from metr.components import (
     IdList,
     SensorLocations,
 )
-from metr.components.metr_imc.interpolation import (
-    TimeMeanFillInterpolator,
-    Interpolator,
-)
-from tests.missings.conftest import Configs
+from metr.components.metr_imc.interpolation import Interpolator
 
-print("test_interpolation started")
-
+# 한 폴더 내에 여러 데이터에 대한 보간을 수행하는 테스트
 
 def test_interpolation(
     traffic_dataset: List[Tuple[str, str, TrafficData]],

@@ -35,6 +35,8 @@ class TimeMeanFillInterpolator(Interpolator):
         return result
 
 
+
+# 아래 보간법은 폐기. 시계열 데이터에 맞는 보간법이 아님.
 class IterativeRandomForestInterpolator(Interpolator):
     def __init__(
         self,
