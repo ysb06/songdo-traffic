@@ -5,9 +5,8 @@
 			"name": "Run ARIMA Test",
 			"type": "debugpy",
 			"request": "launch",
-			"module": "pytest",
+			"module": "songdo_arima",
 			"console": "integratedTerminal",
-			"args": ["-s", "tests/test_training_short.py"]
 		},
 	]
 }

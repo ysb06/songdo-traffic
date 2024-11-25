@@ -4,11 +4,37 @@ import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import IterativeImputer
+from tqdm import tqdm
 
 
 class Interpolator:
     def interpolate(self, df: pd.DataFrame) -> pd.DataFrame:
         raise NotImplementedError
+
+
+class LinearInterpolator(Interpolator):
+    def interpolate(self, df: pd.DataFrame) -> pd.DataFrame:
+        return df.interpolate(method="linear", axis=0)
+
+
+class SplineLinearInterpolator(Interpolator):
+    def interpolate(self, df: pd.DataFrame) -> pd.DataFrame:
+        return df.interpolate(method="slinear", axis=0)
+
+
+class SplineInterpolator(Interpolator):
+    def __init__(self, order: int = 3) -> None:
+        self.order = order
+
+    def interpolate(self, df: pd.DataFrame) -> pd.DataFrame:
+        df = df.copy()
+        with tqdm(total=len(df.columns)) as pbar:
+            for col in df.columns:
+                pbar.set_description(col, refresh=True)
+                df[col] = df[col].interpolate(method="spline", order=self.order)
+                pbar.update(1)
+
+        return df
 
 
 class TimeMeanFillInterpolator(Interpolator):
@@ -33,7 +59,6 @@ class TimeMeanFillInterpolator(Interpolator):
         result = result.round()
         result = result.astype(int)
         return result
-
 
 
 # 아래 보간법은 폐기. 시계열 데이터에 맞는 보간법이 아님.

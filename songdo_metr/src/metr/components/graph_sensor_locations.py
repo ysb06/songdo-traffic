@@ -39,9 +39,10 @@ class SensorLocations:
 
         return SensorLocations(raw)
 
+    @staticmethod
     def import_from_nodelink(
         nodelink_dir: str,
-        road_filename: str,
+        road_filename: str = "imc_link.shp",
     ) -> "SensorLocations":
         """도로 데이터로부터 센서 위치 데이터를 가져옵니다. 단, 센서 위치는 정확히 알 수 없으므로 도로의 중간 지점을 센서 위치로 가정합니다.
 

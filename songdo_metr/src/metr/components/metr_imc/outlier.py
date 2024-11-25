@@ -1,7 +1,11 @@
+import logging
 from typing import Dict
+
 import numpy as np
 import pandas as pd
 import scipy.stats as stats
+
+logger = logging.getLogger(__name__)
 
 
 class OutlierProcessor:
@@ -12,7 +16,7 @@ class OutlierProcessor:
         original_count = df.count()
         df_clean = self._process(df)
         clean_count = df_clean.count()
-        print(f"Outliers removed: {(original_count - clean_count).sum()}")
+        logger.info(f"Outliers removed: {(original_count - clean_count).sum()}")
 
         return df_clean
 
@@ -39,6 +43,7 @@ class RemovingWeirdZeroOutlierProcessor(OutlierProcessor):
             return series
 
         return df.apply(extend_nans_around_zeros)
+
 
 class SimpleAbsoluteOutlierProcessor(OutlierProcessor):
     def __init__(self, threshold: float = 8000) -> None:

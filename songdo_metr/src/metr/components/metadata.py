@@ -7,6 +7,7 @@ import networkx as nx
 import pandas as pd
 from shapely.geometry import LineString
 from tqdm import tqdm
+
 from .metr_ids import IdList
 
 logger = logging.getLogger(__name__)
@@ -14,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 class Metadata:
     @staticmethod
-    def import_from_geopandas(
+    def import_from_nodelink(
         nodelink_dir: str,
         road_filename: str = "imc_link.shp",
     ) -> "Metadata":

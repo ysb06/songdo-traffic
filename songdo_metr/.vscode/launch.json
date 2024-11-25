@@ -6,38 +6,20 @@
 	"version": "0.2.0",
 	"configurations": [
 		{
-			"name": "Run missings Test",
+			"name": "Run METR-IMC Generation Baseline",
+			"type": "debugpy",
+			"request": "launch",
+			"module": "metr",
+			"console": "integratedTerminal",
+		},
+		{
+			"name": "Run METR-IMC Test",
 			"type": "debugpy",
 			"request": "launch",
 			"module": "pytest",
 			"console": "integratedTerminal",
-			"args": ["-s", "tests/missings"]
-		},
-		{
-			"name": "Generate METR-IMC",
-			"type": "debugpy",
-			"request": "launch",
-			"module": "metr.dataset.metr_imc",
-			"console": "integratedTerminal",
-		},
-		{
-			"name": "Generate Node-Link",
-			"type": "debugpy",
-			"request": "launch",
-			"module": "metr.dataset.nodelink",
-			"console": "integratedTerminal",
-		},
-		{
-			"name": "Generate IMCRTS",
-			"type": "debugpy",
-			"request": "launch",
-			"module": "metr.dataset.imcrts",
-			"console": "integratedTerminal",
 			"args": [
-				"--start_date",
-				"20230901",
-				"--end_date",
-				"20240831"
+				"-s", "tests/test_compare.py"
 			]
 		},
 		{

@@ -49,7 +49,7 @@ def test_dataset_generation(configs: Configs):
     MetrImcDatasetGenerator(nodelink_dir, imcrts_dir).generate(target_dir)
 
 def test_metadata_generation(configs: Configs):
-    metadata = Metadata.import_from_geopandas(configs.NODELINK_TARGET_DIR)
+    metadata = Metadata.import_from_nodelink(configs.NODELINK_TARGET_DIR)
 
     hdf_path = os.path.join(configs.target_dir, "metadata.h5")
     xls_path = os.path.join(configs.target_dir, "miscellaneous", "metadata.xlsx")
