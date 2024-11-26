@@ -127,6 +127,8 @@ def train_sensor(
             "recording_timestamp": pd.Timestamp.now().strftime("%d %b %Y, %H:%M:%S"),
         }
         result["name"] = train_data.name
+        result["period_for_training"] = (train_data.index[0], train_data.index[-1])
+        result["period_for_validation"] = (valid_data.index[0], valid_data.index[-1])
         best_params = model.get_params()
         result["best_params"] = {
             "order": list(best_params["order"]),
