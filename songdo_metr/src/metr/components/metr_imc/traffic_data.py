@@ -89,6 +89,10 @@ class TrafficData:
         self._sensor_filter = self.data.columns.to_list()
         self.__start_time = self.data.index.min()
         self.__end_time = self.data.index.max()
+    
+    def fix_data(self):
+        self._raw = self.data.copy()
+        self.reset_data()
 
     @property
     def missings_info(self) -> pd.DataFrame:

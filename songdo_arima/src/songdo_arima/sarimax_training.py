@@ -1,34 +1,22 @@
+import glob
+import logging
 import os
 import pickle
-import glob
 from dataclasses import asdict
-from typing import Dict, Tuple
+from typing import Dict, List, Tuple
 
 import pandas as pd
 import yaml
 
-# 병렬 처리를 위한 라이브러리 임포트
 from joblib import Parallel, delayed
 from metr.components import TrafficData
 from pmdarima import ARIMA, auto_arima
 from sklearn.metrics import mean_absolute_error, root_mean_squared_error
-
-from songdo_arima.utils import HyperParams
 from tqdm import tqdm
 
+logger = logging.getLogger(__name__)
 
-def train_all():
-    yaml_path = os.path.join("./configs", "config.yaml")
-    with open(yaml_path, "r") as f:
-        config = yaml.load(f, Loader=yaml.FullLoader)
-
-    data_root_dir = config["traffic_data_root_dir"]
-
-    query = os.path.join(data_root_dir, "**")
-    glob_objs = glob.glob(query, recursive=True)
-    for glob_obj in glob_objs:
-        if "metr-imc.h5" in glob_obj:
-            train_model(glob_obj, config)
+training_timestamp = pd.Timestamp.now().strftime("%d %b %Y, %H:%M:%S")
 
 
 def train_model(traffic_data_path: str, config: Dict):
@@ -36,6 +24,16 @@ def train_model(traffic_data_path: str, config: Dict):
     raw_dir = os.path.dirname(traffic_data_path)
     output_dir = os.path.join(raw_dir, "sarimax")
     os.makedirs(output_dir, exist_ok=True)
+    logger.info(f"Output directory: {output_dir}")
+
+    start_datetime = config["start_datetime"]
+    end_datetime = config["end_datetime"]
+    if start_datetime is not None:
+        logger.info(f"Start datetime: {start_datetime}")
+        raw.start_time = start_datetime
+    if end_datetime is not None:
+        logger.info(f"End datetime: {end_datetime}")
+        raw.end_time = end_datetime
 
     raw_data = raw.data
     data_size = raw_data.shape[0]
@@ -43,10 +41,19 @@ def train_model(traffic_data_path: str, config: Dict):
     train_data = raw_data.iloc[:train_size, :]
     valid_data = raw_data.iloc[train_size:, :]
 
-    results = Parallel(n_jobs=2)(
-        delayed(train_sensor)(train_data[column], valid_data[column], output_dir)
+    results = Parallel(n_jobs=3)(
+        delayed(train_sensor)(
+            train_data[column], valid_data[column], output_dir, config
+        )
         for column in tqdm(raw_data.columns)
     )
+    ## Not using Parallel
+    # results: List[Tuple[float, float]] = []
+    # for column in tqdm(raw_data.columns):
+    #     result = train_sensor(
+    #         train_data[column], valid_data[column], output_dir, config
+    #     )
+    #     results.append(result)
 
     # MAE와 RMSE의 합계 및 개수 계산
     mae_sum = sum(mae for mae, _ in results)
@@ -56,7 +63,7 @@ def train_model(traffic_data_path: str, config: Dict):
 
     config_output_path = os.path.join(output_dir, "results.yaml")
 
-    result = {}
+    result = {"timestamp": training_timestamp}
     result.update(config)
     result["data_shape"] = raw_data.shape
     result["train_size"] = train_size
@@ -68,78 +75,43 @@ def train_model(traffic_data_path: str, config: Dict):
         yaml.dump(result, f)
 
 
-class BestARIMA:
-    def __init__(self, model: ARIMA) -> None:
-        self.best_model = model
-        self.result = {}
-
-
-def train(config: HyperParams) -> dict:
-    output_dir = config.output_root_dir
-    model_output_dir = os.path.join(output_dir, "models")
-    os.makedirs(model_output_dir, exist_ok=True)
-
-    raw = TrafficData.import_from_hdf(config.traffic_training_data_path)
-    raw_data = raw.data
-    data_size = raw_data.shape[0]
-    train_size = int(data_size * config.training_data_ratio)
-    train_data = raw_data.iloc[:train_size, :]
-    valid_data = raw_data.iloc[train_size:, :]
-
-    # 병렬 연산을 통해 각 센서에 대한 모델 학습
-    results = Parallel(n_jobs=4)(
-        delayed(train_sensor)(train_data[column], valid_data[column], model_output_dir, config)
-        for column in tqdm(raw_data.columns)
-    )
-
-    # MAE와 RMSE의 합계 및 개수 계산
-    mae_sum = sum(mae for mae, _ in results)
-    rmse_sum = sum(rmse for _, rmse in results)
-    mae_count = len(results)
-    rmse_count = len(results)
-
-    config_output_path = os.path.join(model_output_dir, "results.yaml")
-    config_dict = asdict(config)
-    config_dict["data_shape"] = raw_data.shape
-    config_dict["train_size"] = train_size
-    config_dict["valid_size"] = data_size - train_size
-    config_dict["mean_MAE"] = mae_sum / mae_count
-    config_dict["mean_RMSE"] = rmse_sum / rmse_count
-
-    with open(config_output_path, "w") as f:
-        yaml.dump(config_dict, f)
-
-    return config_dict
-
-
 def train_sensor(
-    train_data: pd.Series, valid_data: pd.Series, model_output_dir: str, config: Dict
+    train_data: pd.Series,
+    valid_data: pd.Series,
+    model_output_dir: str,
+    config: Dict,
+    force_training: bool = False,
 ) -> Tuple[float, float]:
     model_output_path = os.path.join(
-        model_output_dir, "results", f"{train_data.name}.pkl"
+        model_output_dir, "results", f"{train_data.name}.yaml"
     )
     os.makedirs(os.path.dirname(model_output_path), exist_ok=True)
 
-    if not os.path.exists(model_output_path):
-        model: ARIMA = auto_arima(
-            train_data,
-            start_p=0,
-            max_p=config["max_p"],
-            start_q=0,
-            max_q=config["max_q"],
-            d=None,  # 'd' 값을 자동으로 결정
-            start_P=0,
-            max_P=config["max_P"],
-            start_Q=0,
-            max_Q=config["max_Q"],
-            D=None,  # 'D' 값을 자동으로 결정
-            m=config["m"],  # 계절 주기 (시간별 데이터의 일일 계절성)
-            seasonal=True,
-            stepwise=True,  # 스텝와이즈 알고리즘 사용으로 계산 시간 단축
-            suppress_warnings=True,
-            error_action="ignore",
-            trace=False,  # 진행 상황을 보려면 True로 설정
-        )
+    is_stationary_test_passed = True
+    if not os.path.exists(model_output_path) or force_training:
+        try:
+            model: ARIMA = auto_arima(
+                train_data,
+                **config["hyperparams"],
+                seasonal=True,
+                stepwise=True,
+            )
+            # model: ARIMA = auto_arima(
+            #     train_data,
+            #     m=config["m"],  # 계절 주기 (시간별 데이터의 일일 계절성)
+            #     seasonal=True,
+            #     stepwise=True,  # 스텝와이즈 알고리즘 사용으로 계산 시간 단축
+            # )
+        except ValueError as e:
+            logger.error(f"ValueError: {e}")
+            is_stationary_test_passed = False
+            model: ARIMA = auto_arima(
+                train_data,
+                **config["hyperparams"],
+                seasonal=True,
+                stepwise=True,
+                stationary=True,
+            )
 
         # 검증 데이터에 대한 예측
         n_periods = len(valid_data)
@@ -147,25 +119,33 @@ def train_sensor(
         forecast = pd.Series(forecast, index=valid_data.index)
 
         # MAE 및 RMSE 계산
-        mae = mean_absolute_error(valid_data, forecast)
-        rmse = root_mean_squared_error(valid_data, forecast)
+        mae = mean_absolute_error(valid_data, forecast).item()
+        rmse = root_mean_squared_error(valid_data, forecast).item()
 
-        result = {}
-        result["Best Params"] = model.get_params()
-        result["MAE"] = mae
-        result["RMSE"] = rmse
+        result = {
+            "training_timestamp": training_timestamp,
+            "recording_timestamp": pd.Timestamp.now().strftime("%d %b %Y, %H:%M:%S"),
+        }
+        result["name"] = train_data.name
+        best_params = model.get_params()
+        result["best_params"] = {
+            "order": list(best_params["order"]),
+            "seasonal_order": list(best_params["seasonal_order"]),
+            "maxiter": best_params["maxiter"],
+            "scoring": best_params["scoring"],
+            "with_intercept": best_params["with_intercept"],
+        }
+        result["mae"] = mae
+        result["rmse"] = rmse
+        result["stationary_test_passed"] = is_stationary_test_passed
 
         # 모델 저장
-        with open(model_output_path, "wb") as pkl:
-            pickle.dump(result, pkl)
-            order = model.order
-            seasonal_order = model.seasonal_order
-            print(f"센서 {train_data.name} is trained: {order} {seasonal_order}")
+        with open(model_output_path, "w") as f:
+            yaml.dump(result, f)
     else:
-        with open(model_output_path, "rb") as pkl:
-            result: Dict = pickle.load(pkl)
+        with open(model_output_path, "r") as f:
+            result: Dict = yaml.load(f, Loader=yaml.FullLoader)
             mae = result["MAE"]
             rmse = result["RMSE"]
-            print(f"센서 {train_data.name} is already trained")
 
     return mae, rmse

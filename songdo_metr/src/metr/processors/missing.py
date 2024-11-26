@@ -1,25 +1,16 @@
+import glob
 import logging
 import os
-import glob
 
-import geopandas as gpd
-
-from metr.components import (
-    AdjacencyMatrix,
-    DistancesImc,
-    IdList,
-    Metadata,
-    SensorLocations,
-    TrafficData,
-)
+from metr.components import TrafficData
 from metr.components.metr_imc.interpolation import (
-    TimeMeanFillInterpolator,
     LinearInterpolator,
-    SplineLinearInterpolator,
     SplineInterpolator,
+    SplineLinearInterpolator,
+    TimeMeanFillInterpolator,
 )
-from metr.processors import *
 from metr.dataset import generate_file_set
+from metr.processors import *
 
 logger = logging.getLogger(__name__)
 
@@ -45,13 +36,14 @@ def interpolate(
     sensor_locations_filename: str = SENSOR_LOCATIONS_FILENAME,
     distances_filename: str = DISTANCES_FILENAME,
     adj_mx_filename: str = ADJ_MX_FILENAME,
+    threshold: float = 0.9,
 ):
     traffic_data = TrafficData.import_from_hdf(traffic_data_path, dtype=float)
 
     processor_set = [
         (LinearInterpolator(), "linear"),  # Linear Interpolation
         (SplineLinearInterpolator(), "spline_linear"),  # Spline Linear Interpolation??
-        (SplineInterpolator(), "spline"),  # 3rd Order Spline Interpolation
+        (SplineInterpolator(n_jobs=8), "spline"),  # 3rd Order Spline Interpolation
         (TimeMeanFillInterpolator(), "time_mean_fill"),  # Time Mean Fill Interpolation
     ]
 
@@ -67,8 +59,17 @@ def interpolate(
         os.makedirs(os.path.join(output_dir, name), exist_ok=True)
 
         traffic_data.reset_data()
-        is_interpolated = traffic_data._raw.isna()
+
+        # Drop columns with missing values over threshold
+        missing_counts = traffic_data.data.isna().sum()
+        missing_over_threshold = missing_counts[missing_counts > threshold * traffic_data.data.shape[0]]
+        missing_columns_over_threshold = missing_over_threshold.index
+        traffic_data.data = traffic_data.data.drop(columns=missing_columns_over_threshold)
+        logger.info(f"Columns dropped(>{threshold}):\r\n {missing_over_threshold}")
+
+        is_interpolated = traffic_data.data.isna().copy()
         traffic_data.interpolate(processor)
+
         traffic_data.to_hdf(traffic_data_path)
         is_interpolated.to_hdf(missing_data_path, key="data")
 
