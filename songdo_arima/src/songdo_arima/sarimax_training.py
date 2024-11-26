@@ -147,7 +147,7 @@ def train_sensor(
     else:
         with open(model_output_path, "r") as f:
             result: Dict = yaml.load(f, Loader=yaml.FullLoader)
-            mae = result["MAE"]
-            rmse = result["RMSE"]
+            mae = result["mae"]
+            rmse = result["rmse"]
 
     return mae, rmse
