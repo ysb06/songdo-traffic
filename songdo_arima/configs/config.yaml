@@ -14,7 +14,13 @@ hyperparams:
 start_datetime: "2024-03-01 00:00:00"
 end_datetime: null
 
+target_sample_rate: 0.1
+random_seed: 42
+
 training_data_ratio: 0.8
+
+
+# ----- #
 
 traffic_data_root_dir: "../output/metr-imc-interpolated"
 

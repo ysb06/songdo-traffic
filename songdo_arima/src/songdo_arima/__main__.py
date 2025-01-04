@@ -19,4 +19,3 @@ for glob_obj in glob_objs:
     if "metr-imc.h5" in glob_obj:
         logger.info(f"Training model for {glob_obj}")
         train_model(glob_obj, config)
-        break
