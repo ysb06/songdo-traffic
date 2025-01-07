@@ -18,6 +18,9 @@
 		},
 		{
 			"path": "songdo_arima"
+		},
+		{
+			"path": "songdo_rnn"
 		}
 	],
 	"settings": {

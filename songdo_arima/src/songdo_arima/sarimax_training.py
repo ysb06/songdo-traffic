@@ -93,7 +93,7 @@ def train_model(traffic_data_path: str, config: Dict):
 
     result = {"timestamp": training_timestamp}
     result.update(config)
-    result["data_shape"] = raw_data.shape
+    result["data_shape"] = [raw_data.shape[0], raw_data.shape[1]]
     result["training_sampled_columns_size"] = len(target_columns)
     result["train_size"] = train_size
     result["valid_size"] = data_size - train_size
