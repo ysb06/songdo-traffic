@@ -1,3 +1,4 @@
+import random
 from typing import Sequence, Union
 
 import numpy as np
@@ -30,3 +31,13 @@ def symmetric_mean_absolute_percentage_error(
     smape_val = np.mean(numerator / denominator) * 100.0
 
     return smape_val.item()
+
+
+def fix_seed(seed: int):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False

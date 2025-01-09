@@ -1,5 +1,8 @@
+import glob
 import logging
 import os
+import random
+from datetime import datetime
 from typing import Optional
 
 import yaml
@@ -7,23 +10,54 @@ from lightning import Trainer
 from lightning.pytorch.callbacks import (EarlyStopping, LearningRateMonitor,
                                          ModelCheckpoint)
 from lightning.pytorch.loggers import WandbLogger
+from metr.components.metr_imc import TrafficData
 from sklearn.metrics import (mean_absolute_error,
                              mean_absolute_percentage_error,
                              root_mean_squared_error)
 
-from .dataset import TrafficDataModule
-from .model import SongdoTrafficLightningModel
-from .test import evaluate_model
-from .utils import symmetric_mean_absolute_percentage_error
+import wandb
+
+from ..dataset import TrafficDataModule
+from ..model import SongdoTrafficLightningModel
+from ..test import evaluate_model
+from ..utils import fix_seed, symmetric_mean_absolute_percentage_error
 
 OUTPUT_DIR = "./output/predictions"
+TARGET_DATA_PATH = "./output/all_processed"
 
 logger = logging.getLogger(__name__)
 
-# 1. 하이퍼 파라미터 설정
+
+def do_experiment(
+    sensor_sample_rate=0.1,
+    seed=47,
+    target_data_path=TARGET_DATA_PATH,
+):
+    fix_seed(seed)
+
+    targets = glob.glob(f"{target_data_path}/*.h5", recursive=True)
+    training_id = datetime.now().strftime("%Y%m%d%H%M%S")
+    for target in targets:
+        logger.info(f"Training model with {target}")
+        raw = TrafficData.import_from_hdf(target)
+        sensor_list = raw.data.columns
+
+        target_sensors = random.sample(
+            range(len(sensor_list)), round(len(sensor_list) * sensor_sample_rate)
+        )
+
+        for idx in target_sensors:
+            train_traffic_model(
+                training_id=training_id,
+                traffic_data_path=target,
+                target_sensor_idx=idx,
+            )
 
 
 def train_traffic_model(
+    # 1. 하이퍼 파라미터 설정
+    training_id: Optional[str] = None,
+    model_postfix: Optional[str] = None,
     # 1-1. 데이터 경로 및 기간 설정
     traffic_data_path: str = "./output/all_processed/abs_cap-linear.h5",
     start_datetime: Optional[str] = "2024-01-01 00:00:00",
@@ -42,12 +76,13 @@ def train_traffic_model(
     epochs: int = 50,
     batch_size: int = 64,
     learning_rate: float = 0.001,
-    lr_step_size: int = 128,
-    lr_gamma: float = 0.8,
+    lr_step_size: int = 256,
+    lr_gamma: float = 0.6,
     # 1-5. 기타
-    save_path_group: str = None,
-    metrics_path_postfix: str = "",
+    verbose: bool = False,
 ):
+    model_postfix = f"_{model_postfix}" if model_postfix is not None else ""
+
     # 2. 데이터 모듈 생성
     data_module = TrafficDataModule(
         traffic_data_path=traffic_data_path,
@@ -73,19 +108,29 @@ def train_traffic_model(
 
     # 4. Trainer 생성 및 학습
     # 4.1. 저장 경로 설정
-    subgroup_name = os.path.basename(traffic_data_path).split(".")[0]
-    output_dir = (
-        os.path.join(OUTPUT_DIR, save_path_group)
-        if save_path_group is not None
-        else OUTPUT_DIR
+    model_group_name = os.path.basename(traffic_data_path).split(".")[0]
+    model_name = os.path.join(model_group_name, f"target_{target_sensor_idx:04d}")
+    output_dir = os.path.join(OUTPUT_DIR, model_group_name, model_name)
+    metrics_file_name = (
+        f"metrics{model_postfix}.yaml" if model_postfix is not None else "metrics.yaml"
     )
-    output_dir = os.path.join(
-        output_dir, subgroup_name, f"target_{target_sensor_idx:04d}"
-    )
+
+    # 이미 학습된 모델이 있는 경우 skip
+    if os.path.exists(output_dir):
+        file_list = os.listdir(output_dir)
+        is_checkpoint = any([file.endswith(".ckpt") for file in file_list])
+        is_metrics = any([file == metrics_file_name for file in file_list])
+        if is_checkpoint and is_metrics:
+            logger.info(f"Already Trained: Skipping {output_dir}")
+            return
+
     logger.info(f"Output directory: {output_dir}")
 
     # 4.2. Wandb 연동
-    wandb_logger = WandbLogger(log_model="all", project="Songdo_RNN")
+    run_name = f"{training_id}_{model_name}" if training_id is not None else model_name
+    if model_postfix is not None:
+        run_name += f"{model_postfix}"
+    wandb_logger = WandbLogger(name=run_name, log_model="all", project="Songdo_RNN")
 
     trainer = Trainer(
         max_epochs=epochs,
@@ -95,9 +140,10 @@ def train_traffic_model(
         default_root_dir=output_dir,
         logger=wandb_logger,
         callbacks=[
-            EarlyStopping(monitor="val_loss", mode="min", patience=5, verbose=True),
+            EarlyStopping(monitor="val_loss", mode="min", patience=5, verbose=verbose),
             ModelCheckpoint(
-                filename="best-{epoch:02d}-{val_loss:.2f}",
+                dirpath=output_dir,
+                filename=f"best{model_postfix}" + "-{epoch:02d}-{val_loss:.2f}",
                 save_top_k=1,
                 monitor="val_loss",
                 mode="min",
@@ -106,6 +152,7 @@ def train_traffic_model(
         ],
     )
 
+    logger.info(f"Training with {run_name}...")
     trainer.fit(model, datamodule=data_module)
 
     final_train_loss = trainer.callback_metrics.get("train_loss")
@@ -163,11 +210,12 @@ def train_traffic_model(
         "test_smape": test_smape,
     }
 
-    # yaml_path = os.path.join(output_dir, f"metrics_{metrics_path_postfix}.yaml")
-    # with open(yaml_path, "w") as f:
-    #     yaml.safe_dump(metrics_dict, f)
+    yaml_path = os.path.join(output_dir, metrics_file_name)
+    with open(yaml_path, "w") as f:
+        yaml.safe_dump(metrics_dict, f)
 
-    # logger.info(f"Metrics saved to {yaml_path}")
+    logger.info(f"Metrics saved to {yaml_path}")
+    wandb.finish()
 
 
 if __name__ == "__main__":
