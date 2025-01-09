@@ -1,3 +1,4 @@
+import logging
 from typing import List, Optional
 
 import lightning as L
@@ -6,8 +7,10 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
+logger = logging.getLogger(__name__)
 
-class SongdoTrafficLightning(L.LightningModule):
+
+class SongdoTrafficLightningModel(L.LightningModule):
     def __init__(
         self,
         input_dim: int = 1,
@@ -15,6 +18,8 @@ class SongdoTrafficLightning(L.LightningModule):
         num_layers: int = 1,
         output_dim: int = 1,
         learning_rate: float = 1e-3,
+        lr_step_size: int = 100,
+        lr_gamma: float = 0.5,
     ) -> None:
         super().__init__()
         self.save_hyperparameters()
@@ -55,18 +60,23 @@ class SongdoTrafficLightning(L.LightningModule):
         self.log("test_loss", loss, prog_bar=True)
 
         return loss
-    
+
     def predict_step(self, batch, _):
         x_batch: torch.Tensor = batch[0]
         y_batch: torch.Tensor = batch[1]
         preds: torch.Tensor = self(x_batch)
-        
+
         return preds.cpu(), y_batch.cpu()
 
     def configure_optimizers(self):
         optimizer = optim.Adam(self.model.parameters(), lr=self.hparams.learning_rate)
+        scheduler = optim.lr_scheduler.StepLR(
+            optimizer,
+            step_size=self.hparams.lr_step_size,
+            gamma=self.hparams.lr_gamma,
+        )
 
-        return optimizer
+        return [optimizer], [{"scheduler": scheduler, "interval": "step"}]
 
 
 class TrafficRNN(nn.Module):

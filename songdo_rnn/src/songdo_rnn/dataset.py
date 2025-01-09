@@ -15,8 +15,8 @@ class TrafficDataModule(L.LightningDataModule):
         start_datetime: Optional[str] = "2024-03-01 00:00:00",
         end_datetime: Optional[str] = "2024-09-30 23:00:00",
         target_traffic_sensor: int = 0,
-        training_data_ratio: float = 0.7,
-        validation_data_ratio: float = 0.1,
+        training_set_ratio: float = 0.7,
+        validation_set_ratio: float = 0.1,
         seq_length: int = 24,
         batch_size: int = 64,
         num_workers: int = 8,
@@ -26,16 +26,19 @@ class TrafficDataModule(L.LightningDataModule):
         self.start_datetime = start_datetime
         self.end_datetime = end_datetime
         self.target_traffic_sensor = target_traffic_sensor
-        self.training_data_ratio = training_data_ratio
-        self.validation_data_ratio = validation_data_ratio
+        self.training_set_ratio = training_set_ratio
+        self.validation_set_ratio = validation_set_ratio
         self.seq_length = seq_length
         self.batch_size = batch_size
         self.num_workers = num_workers
 
+        self.raw_dataset: Optional[TrafficDataset] = None
         self.train_dataset: Optional[TrafficDataset] = None
         self.valid_dataset: Optional[TrafficDataset] = None
         self.test_dataset: Optional[TrafficDataset] = None
-        self.scaler = None
+        self.scaler: Optional[MinMaxScaler] = None
+
+        self.target_name: Optional[str] = None
 
     def prepare_data(self) -> None:
         """
@@ -52,15 +55,17 @@ class TrafficDataModule(L.LightningDataModule):
         if self.end_datetime is not None:
             traffic_data.end_time = self.end_datetime
 
-        data = traffic_data.data.iloc[:, self.target_traffic_sensor].values
+        data_raw = traffic_data.data.iloc[:, self.target_traffic_sensor]
+        data = data_raw.values
+        self.target_name = data_raw.name
 
-        dataset = TrafficDataset(data=data, seq_length=self.seq_length)
-        self.scaler = dataset.scaler  # scaler 보관
-
+        self.raw_dataset = TrafficDataset(data=data, seq_length=self.seq_length)
+        self.scaler = self.raw_dataset.scaler
+            
         train_subset, valid_subset, test_subset = split_train_valid_test(
-            dataset,
-            train_ratio=self.training_data_ratio,
-            valid_ratio=self.validation_data_ratio,
+            self.raw_dataset,
+            train_ratio=self.training_set_ratio,
+            valid_ratio=self.validation_set_ratio,
         )
         self.train_dataset = train_subset
         self.valid_dataset = valid_subset
@@ -76,7 +81,7 @@ class TrafficDataModule(L.LightningDataModule):
 
     def val_dataloader(self) -> DataLoader:
         return DataLoader(
-            self.test_dataset,
+            self.valid_dataset,
             batch_size=self.batch_size,
             shuffle=False,
             # num_workers=self.num_workers,
@@ -126,6 +131,11 @@ class TrafficDataset(Dataset):
     def __getitem__(self, index: int):
         x = self.scaled_data[index : index + self.seq_length]
         y = self.scaled_data[index + self.seq_length]
+
+        if np.nan in x.squeeze(1).cpu().tolist():
+            raise ValueError("x contains NaN")
+        if np.nan in y.cpu().tolist():
+            raise ValueError("y contains NaN")
 
         return x, y
 

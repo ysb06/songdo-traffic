@@ -29,4 +29,4 @@ def symmetric_mean_absolute_percentage_error(
 
     smape_val = np.mean(numerator / denominator) * 100.0
 
-    return smape_val
+    return smape_val.item()

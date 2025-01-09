@@ -1,21 +1,23 @@
+import logging
+import os
 from typing import List, Optional, Tuple
 
 import lightning as L
 import numpy as np
+from sklearn.metrics import mean_absolute_error, root_mean_squared_error
 from sklearn.preprocessing import MinMaxScaler
 from torch.utils.data import DataLoader
-from .dataset import TrafficDataModule
+
+logger = logging.getLogger(__name__)
 
 
 def evaluate_model(
     model: L.LightningModule,
     trainer: L.Trainer,
-    data_module: TrafficDataModule,
+    scaler: MinMaxScaler,
+    dataloader: DataLoader,
 ) -> Tuple[np.ndarray, np.ndarray]:
-    dataloaders = data_module.predict_dataloader()
-    scaler = data_module.scaler
-
-    train_predictions = trainer.predict(model, dataloaders=dataloaders)
+    train_predictions = trainer.predict(model, dataloaders=dataloader)
 
     train_preds_list: List[np.ndarray] = []
     train_true_list: List[np.ndarray] = []
@@ -30,5 +32,3 @@ def evaluate_model(
     train_y_inv = scaler.inverse_transform(train_true_arr)
 
     return train_preds_inv.squeeze(1), train_y_inv.squeeze(1)
-
-
