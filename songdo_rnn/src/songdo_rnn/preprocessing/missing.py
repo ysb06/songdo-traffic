@@ -8,6 +8,10 @@ from metr.components.metr_imc.interpolation import (
     Interpolator,
     LinearInterpolator,
     SplineLinearInterpolator,
+    TimeMeanFillInterpolator,
+    ShiftFillInterpolator,
+    MonthlyMeanFillInterpolator,
+    # Todo: SARIMA
 )
 import pandas as pd
 import seaborn as sns
@@ -24,6 +28,8 @@ def process_missing():
     interpolators: List[Interpolator] = [
         LinearInterpolator(),
         SplineLinearInterpolator(),
+        TimeMeanFillInterpolator(),
+        ShiftFillInterpolator(shift=7),
     ]
     traffic_files = glob.glob(os.path.join(OUTLIER_PROCESSED_DIR, "*.h5"))
     for file_path in traffic_files:
@@ -49,5 +55,5 @@ def process_missing():
 
             traffic_data.sensor_filter = sensors_with_no_missing.index.to_list()
             logger.info(f"Final Data: {traffic_data.data.shape}")
-            filename = f"{file_basename[:7]}-{interpolator.__class__.__name__.lower().removesuffix('interpolator')}.h5"
+            filename = f"{file_basename}-{interpolator.__class__.__name__.lower().removesuffix('interpolator')}.h5"
             traffic_data.to_hdf(os.path.join(OUTPUT_DIR, filename))

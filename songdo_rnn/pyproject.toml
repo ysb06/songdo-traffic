@@ -20,7 +20,7 @@ distribution = true
 
 [dependency-groups]
 dev = [
-    "songdo-metr @ file:///${PROJECT_ROOT}/../songdo_metr",
+    "-e songdo-metr @ file:///${PROJECT_ROOT}/../songdo_metr",
 ]
 test = [
     "pytest>=8.3.4",

@@ -1,22 +1,20 @@
 import glob
 import logging
-import os
-import random
 from datetime import datetime
 
-from metr.components.metr_imc import TrafficData
 import yaml
 
-from .best_interpolation_search import train_traffic_model
 from ..preprocessing.missing import process_missing
 from ..preprocessing.outlier import process_outlier
+
+from .best_interpolation_search import train_traffic_model
 from ..utils import fix_seed
 
 TARGET_DATA_PATH = "./output/all_processed"
 
 logger = logging.getLogger(__name__)
 
-
+# 같은 데이터셋 안에서 seq_length에 따른 RNN 모델 성능 비교
 def do_experiment(seed=47):
     fix_seed(seed)
 

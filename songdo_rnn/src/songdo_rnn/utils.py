@@ -1,8 +1,9 @@
 import random
-from typing import Sequence, Union
+from typing import Sequence, Tuple, Union
 
 import numpy as np
 import torch
+from sklearn.metrics import mean_absolute_percentage_error
 
 
 def get_auto_device() -> torch.device:
@@ -12,6 +13,18 @@ def get_auto_device() -> torch.device:
         return torch.device("mps")
     else:
         return torch.device("cpu")
+
+
+def non_zero_mape(true: np.ndarray, pred: np.ndarray) -> Tuple[float, bool]:
+    non_zero_mask = true != 0
+    true_filtered = true[non_zero_mask]
+    pred_filtered = pred[non_zero_mask]
+
+    has_zero = not np.all(non_zero_mask)
+
+    mape = mean_absolute_percentage_error(true_filtered, pred_filtered)
+
+    return mape, has_zero
 
 
 def symmetric_mean_absolute_percentage_error(
