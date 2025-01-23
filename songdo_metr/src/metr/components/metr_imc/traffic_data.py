@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 import logging
 import os
-from typing import List, Optional, Union
+from typing import List, Optional, Set, Union
 
 import numpy as np
 import pandas as pd
@@ -132,14 +132,19 @@ class TrafficData:
 
     def remove_outliers(
         self, processor: Union[OutlierProcessor, List[OutlierProcessor]]
-    ) -> None:
+    ) -> Set[str]:
         if not isinstance(processor, list):
             processor = [processor]
         logger.info("Process Outlier for METR-IMC Traffic data...")
+        failed_set = set()
         for proc in processor:
             logger.info(f"Processing with {proc.__class__.__name__}...")
             self.data = proc.process(self.data)
+            failed_set.update(proc.failed_list)
         logger.info("Processing Complete")
+        # 언젠가 코드를 리팩토링 해야할 것 같음
+        # Outlier 처리나 Interpolation은 외부로 빼는 것이 좋을 것 같음
+        return failed_set
 
     def interpolate(self, interpolator: Interpolator) -> pd.DataFrame:
         logger.info("Interpolating METR-IMC Traffic data...")

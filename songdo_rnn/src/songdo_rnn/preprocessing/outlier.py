@@ -1,15 +1,23 @@
 import logging
 import os
 from typing import Optional
+from copy import deepcopy
+
+from metr.components.metadata import Metadata
+import yaml
+
+# 센서 간 관계로부터 이상치를 판단하는 방법은 제외
+# 해당 방법은 다른 연구를 통해서 좀 더 깊게 연구한다고 명시할 것
+from metr.components.metr_imc import TrafficData
 from metr.components.metr_imc.outlier import (
+    HourlyInSensorZscoreOutlierProcessor,
+    InSensorZscoreOutlierProcessor,
+    MADOutlierProcessor,
     RemovingWeirdZeroOutlierProcessor,
     TrafficCapacityAbsoluteOutlierProcessor,
-    HourlyInSensorZscoreOutlierProcessor,
-    HourlyZscoreOutlierProcessor,
-    MADOutlierProcessor,
+    TrimmedMeanOutlierProcessor,
+    WinsorizedOutlierProcessor,
 )
-from metr.components.metr_imc import TrafficData
-from metr.components.metadata import Metadata
 
 logger = logging.getLogger(__name__)
 
@@ -27,56 +35,78 @@ def process_outlier(
     speed_limit_map = metadata.data.set_index("LINK_ID")["MAX_SPD"].to_dict()
     lane_map = metadata.data.set_index("LINK_ID")["LANES"].to_dict()
 
-    outlier_sets = []
-
-    outlier_set_1 = [
+    base_processor = [
         RemovingWeirdZeroOutlierProcessor(),
         TrafficCapacityAbsoluteOutlierProcessor(speed_limit_map, lane_map),
     ]
-    outlier_set_1_filename = "non_simple.h5"
-    outlier_sets.append((outlier_set_1, outlier_set_1_filename))
+    outlier_filename_1 = "none_simple.h5"
 
-    outlier_set_2 = [
-        RemovingWeirdZeroOutlierProcessor(),
-        TrafficCapacityAbsoluteOutlierProcessor(speed_limit_map, lane_map),
-        HourlyInSensorZscoreOutlierProcessor(),
+    # 2) InSensorZscoreOutlierProcessor - 센서별 Z-Score
+    set_2_processors = [
+        InSensorZscoreOutlierProcessor(threshold=3.0),
     ]
-    outlier_set_2_filename = "zsc_hrsnr.h5"
-    outlier_sets.append((outlier_set_2, outlier_set_2_filename))
+    set_2_processors = deepcopy(base_processor) + set_2_processors
+    outlier_filename_2 = "in_sensor_zscore.h5"
 
-    outlier_set_3 = [
-        RemovingWeirdZeroOutlierProcessor(),
-        TrafficCapacityAbsoluteOutlierProcessor(speed_limit_map, lane_map),
-        HourlyZscoreOutlierProcessor(),
+    # 3) HourlyInSensorZscoreOutlierProcessor - 시간대별 센서 Z-Score
+    set_3_processors = [
+        HourlyInSensorZscoreOutlierProcessor(threshold=3.0),
     ]
-    outlier_set_3_filename = "zsc_hrsimp.h5"
-    outlier_sets.append((outlier_set_3, outlier_set_3_filename))
+    set_3_processors = deepcopy(base_processor) + set_3_processors
+    outlier_filename_3 = "hourly_in_sensor_zscore.h5"
 
-    outlier_set_4 = [
-        RemovingWeirdZeroOutlierProcessor(),
-        TrafficCapacityAbsoluteOutlierProcessor(speed_limit_map, lane_map),
-        MADOutlierProcessor(),
+    # 4) MADOutlierProcessor - 중앙값 절대편차(MAD) 기반
+    set_4_processors = [
+        MADOutlierProcessor(threshold=3.0),
     ]
-    outlier_set_4_filename = "zsc_madev.h5"
-    outlier_sets.append((outlier_set_4, outlier_set_4_filename))
+    set_4_processors = deepcopy(base_processor) + set_4_processors
+    outlier_filename_4 = "mad_outlier.h5"
+
+    # 5) TrimmedMeanOutlierProcessor - 절사평균 기반
+    set_5_processors = [
+        TrimmedMeanOutlierProcessor(rate=0.05, threshold=3.0),
+    ]
+    set_5_processors = deepcopy(base_processor) + set_5_processors
+    outlier_filename_5 = "trimmed_mean.h5"
+
+    # 6) WinsorizedOutlierProcessor - 윈저화 기반
+    set_6_processors = [
+        WinsorizedOutlierProcessor(rate=0.05, zscore_threshold=3.0),
+    ]
+    set_6_processors = deepcopy(base_processor) + set_6_processors
+    outlier_filename_6 = "winsorized.h5"
+
+    outlier_sets = [
+        (base_processor, outlier_filename_1),
+        (set_2_processors, outlier_filename_2),
+        (set_3_processors, outlier_filename_3),
+        (set_4_processors, outlier_filename_4),
+        (set_5_processors, outlier_filename_5),
+        (set_6_processors, outlier_filename_6),
+    ]
 
     # 이상치는 일반적으로 평활화로 처리하는 것을 보임
     # 평활화는 데이터의 불안정하고 불규칙한 특성을 제거해 주기도 하지만 돌발상황과 같은 특별한 정보를 제거해 버릴 수 도 있음.
     # 즉, 평활화는 특별한 목적이 있을 때, 해당 목적에 맞게 알고리즘을 선택하고 적용해야 함.
     # 본 논문에서는 이러한 특별한 정보를 최대한 보존하면서 이상치를 제거하는 데 초점을 맞춤 (추후 데이터셋 제작 시 중요)
 
-
+    failed_list = {}
     for outlier_set, filename in outlier_sets:
         traffic_data = TrafficData.import_from_hdf(TRAFFIC_RAW_PATH, dtype=float)
         if start_datetime is not None:
             traffic_data.start_time = start_datetime
         if end_datetime is not None:
             traffic_data.end_time = end_datetime
-        traffic_data.remove_outliers(outlier_set)
-        traffic_data.to_hdf(os.path.join(OUTPUT_DIR, filename))
+        failed_set = traffic_data.remove_outliers(outlier_set)
+        failed_list[filename] = list(failed_set)
+        output_path = os.path.join(OUTPUT_DIR, filename)
+        traffic_data.to_hdf(output_path)
 
         logger.info(f"Processed {filename} from {TRAFFIC_RAW_PATH}")
         if start_datetime is not None or end_datetime is not None:
             logger.info(
                 f"Time range: From {traffic_data.data.index[0]} to {traffic_data.data.index[-1]}"
             )
+            
+    with open(os.path.join(OUTPUT_DIR, "failed_list.yaml"), "w") as f:
+        yaml.dump(failed_list, f)

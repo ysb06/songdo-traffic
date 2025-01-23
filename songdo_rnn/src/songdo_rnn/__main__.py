@@ -7,7 +7,9 @@ from .plot import plot_loss
 
 logger = logging.getLogger(__name__)
 
+process_outlier()
+process_missing()
 
 
 # do_experiment(skip_preprocessing=True)
-plot_loss()
+# plot_loss()

@@ -75,6 +75,41 @@ class TimeMeanFillInterpolator(Interpolator):
 
 # 추가로 논문을 찾아 보간법을 구현
 
+class ShiftFillInterpolator(Interpolator):
+    def __init__(self, periods: int = 1) -> None:
+        self.periods = periods
+
+    def interpolate(self, df: pd.DataFrame) -> pd.DataFrame:
+        df_index: pd.DatetimeIndex = df.index
+        df_shifted = df.shift(periods=self.periods, freq=df_index.freq)
+        filled_df = df.where(~df.isna(), df_shifted)
+        return filled_df
+
+class MonthlyMeanFillInterpolator(Interpolator):
+    def interpolate(self, df: pd.DataFrame) -> pd.DataFrame:
+        if not isinstance(df.index, pd.DatetimeIndex):
+            raise ValueError("MonthlyMeanFillInterpolator는 DatetimeIndex가 필요합니다.")
+
+        result = df.copy()
+        
+        for col in result.columns:
+            result_index: pd.DatetimeIndex = result.index
+            groups = result[col].groupby([result_index.year, result_index.month])
+
+            # 각 그룹별 평균 계산
+            group_means: pd.Series = groups.mean(skipna=True)
+
+            for key, mean_value in group_means.items():
+                yr, mon = key
+                mask = (
+                    (result_index.year == yr) & 
+                    (result_index.month == mon) & 
+                    (result[col].isna())
+                )
+
+                result.loc[mask, col] = mean_value
+
+        return result
 
 # 아래 보간법은 폐기. 시계열 데이터에 맞는 보간법이 아님.
 class IterativeRandomForestInterpolator(Interpolator):

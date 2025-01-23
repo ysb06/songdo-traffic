@@ -11,7 +11,6 @@ from metr.components.metr_imc.interpolation import (
     TimeMeanFillInterpolator,
     ShiftFillInterpolator,
     MonthlyMeanFillInterpolator,
-    # Todo: SARIMA
 )
 import pandas as pd
 import seaborn as sns
@@ -29,7 +28,8 @@ def process_missing():
         LinearInterpolator(),
         SplineLinearInterpolator(),
         TimeMeanFillInterpolator(),
-        ShiftFillInterpolator(shift=7),
+        ShiftFillInterpolator(periods=7),
+        MonthlyMeanFillInterpolator(),
     ]
     traffic_files = glob.glob(os.path.join(OUTLIER_PROCESSED_DIR, "*.h5"))
     for file_path in traffic_files:
