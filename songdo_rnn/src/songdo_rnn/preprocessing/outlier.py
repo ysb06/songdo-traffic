@@ -1,15 +1,19 @@
 import logging
 import os
-from typing import Optional
+from typing import List, Optional
 from copy import deepcopy
+from glob import glob
 
+from matplotlib import pyplot as plt
 from metr.components.metadata import Metadata
+import pandas as pd
 import yaml
 
 # 센서 간 관계로부터 이상치를 판단하는 방법은 제외
 # 해당 방법은 다른 연구를 통해서 좀 더 깊게 연구한다고 명시할 것
 from metr.components.metr_imc import TrafficData
 from metr.components.metr_imc.outlier import (
+    OutlierProcessor,
     HourlyInSensorZscoreOutlierProcessor,
     InSensorZscoreOutlierProcessor,
     MADOutlierProcessor,
@@ -26,9 +30,86 @@ METADATA_RAW_PATH = "../datasets/metr-imc/metadata.h5"
 OUTPUT_DIR = "./output/outlier_processed"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
+def remove_outliers(data_list: List[TrafficData]):
+    outlier_processors: List[OutlierProcessor] = [
+        InSensorZscoreOutlierProcessor(threshold=3.0),
+        HourlyInSensorZscoreOutlierProcessor(threshold=3.0),
+        MADOutlierProcessor(threshold=3.0),
+        TrimmedMeanOutlierProcessor(rate=0.05, threshold=3.0),
+        WinsorizedOutlierProcessor(rate=0.05, zscore_threshold=3.0),
+    ]
+
+    for data in data_list:
+        for outlier_processor in outlier_processors:
+            outlier_processor_name = outlier_processor.__class__.__name__.lower()
+            outlier_processor_name = outlier_processor_name.removesuffix("outlierprocessor")
+            logger.info(f"Processing with {outlier_processor_name}")
+
+            processed_data = outlier_processor.process(data.data)
+            filename = f"{outlier_processor_name}.h5"
+            filepath = os.path.join(OUTPUT_DIR, filename)
+            processed_data.to_hdf(filepath, key="data")
+
+
+def get_outlier_removed_data_list():
+    data_path_list = glob(os.path.join(OUTPUT_DIR, "*.h5"))
+
+    return [TrafficData.import_from_hdf(path) for path in data_path_list]
+
+
+def remove_base_outliers(
+    start_datetime: Optional[str] = "2023-12-01 00:00:00",
+    end_datetime: Optional[str] = "2024-08-31 23:00:00",
+):
+    raw = TrafficData.import_from_hdf(TRAFFIC_RAW_PATH).data
+    metadata = Metadata.import_from_hdf(METADATA_RAW_PATH)
+    speed_limit_map = metadata.data.set_index("LINK_ID")["MAX_SPD"].to_dict()
+    lane_map = metadata.data.set_index("LINK_ID")["LANES"].to_dict()
+
+    base_proc_1 = RemovingWeirdZeroOutlierProcessor()
+    base_proc_2 = TrafficCapacityAbsoluteOutlierProcessor(
+        speed_limit_map, lane_map, adjustment_rate=1.5
+    )
+
+    base_data = raw.copy()
+    base_nan = base_data.isna().sum().sum()
+    logger.info(f"Raw NaN: {base_nan}")
+    base_data_na_cols = base_data.isna().any(axis=0).sum()
+    logger.info(
+        f"Base data{base_data.shape} has {base_data_na_cols} columns with missing values."
+    )
+
+    proc_1_data = base_proc_1.process(base_data)
+    proc_1_nan = proc_1_data.isna().sum().sum()
+    logger.info(
+        f"Raw NaN({base_nan}) - Prc NaN({proc_1_nan}) = {proc_1_nan - base_nan}"
+    )
+    proc_1_data_na_cols = proc_1_data.isna().any(axis=0).sum()
+    logger.info(
+        f"Proc 1{proc_1_data.shape} has {proc_1_data_na_cols} columns have missing values."
+    )
+
+    proc_2_data = base_proc_2.process(proc_1_data)
+    proc_2_nan = proc_2_data.isna().sum().sum()
+    logger.info(
+        f"From({proc_1_nan}) - Prc NaN({proc_2_nan}) = {proc_2_nan - proc_1_nan}"
+    )
+    proc_2_data_na_cols = proc_2_data.isna().any(axis=0).sum()
+    logger.info(
+        f"Proc 2{proc_2_data.shape} has {proc_2_data_na_cols} columns have missing values."
+    )
+
+    # compare_missing_visualization(proc_1_data, proc_2_data)
+
+    result = proc_2_data.loc[start_datetime:end_datetime]
+    result.to_hdf(os.path.join(OUTPUT_DIR, "base_outlier.h5"), key="data")
+
+
+# ----- Legacy ----- #
+
 
 def process_outlier(
-    start_datetime: Optional[str] = "2024-01-01 00:00:00",
+    start_datetime: Optional[str] = "2023-12-01 00:00:00",
     end_datetime: Optional[str] = "2024-08-31 23:00:00",
 ):
     metadata = Metadata.import_from_hdf(METADATA_RAW_PATH)
@@ -43,37 +124,42 @@ def process_outlier(
 
     # 2) InSensorZscoreOutlierProcessor - 센서별 Z-Score
     set_2_processors = [
+        RemovingWeirdZeroOutlierProcessor(),
+        TrafficCapacityAbsoluteOutlierProcessor(speed_limit_map, lane_map),
         InSensorZscoreOutlierProcessor(threshold=3.0),
     ]
-    set_2_processors = deepcopy(base_processor) + set_2_processors
     outlier_filename_2 = "in_sensor_zscore.h5"
 
     # 3) HourlyInSensorZscoreOutlierProcessor - 시간대별 센서 Z-Score
     set_3_processors = [
+        RemovingWeirdZeroOutlierProcessor(),
+        TrafficCapacityAbsoluteOutlierProcessor(speed_limit_map, lane_map),
         HourlyInSensorZscoreOutlierProcessor(threshold=3.0),
     ]
-    set_3_processors = deepcopy(base_processor) + set_3_processors
     outlier_filename_3 = "hourly_in_sensor_zscore.h5"
 
     # 4) MADOutlierProcessor - 중앙값 절대편차(MAD) 기반
     set_4_processors = [
+        RemovingWeirdZeroOutlierProcessor(),
+        TrafficCapacityAbsoluteOutlierProcessor(speed_limit_map, lane_map),
         MADOutlierProcessor(threshold=3.0),
     ]
-    set_4_processors = deepcopy(base_processor) + set_4_processors
     outlier_filename_4 = "mad_outlier.h5"
 
     # 5) TrimmedMeanOutlierProcessor - 절사평균 기반
     set_5_processors = [
+        RemovingWeirdZeroOutlierProcessor(),
+        TrafficCapacityAbsoluteOutlierProcessor(speed_limit_map, lane_map),
         TrimmedMeanOutlierProcessor(rate=0.05, threshold=3.0),
     ]
-    set_5_processors = deepcopy(base_processor) + set_5_processors
     outlier_filename_5 = "trimmed_mean.h5"
 
     # 6) WinsorizedOutlierProcessor - 윈저화 기반
     set_6_processors = [
+        RemovingWeirdZeroOutlierProcessor(),
+        TrafficCapacityAbsoluteOutlierProcessor(speed_limit_map, lane_map),
         WinsorizedOutlierProcessor(rate=0.05, zscore_threshold=3.0),
     ]
-    set_6_processors = deepcopy(base_processor) + set_6_processors
     outlier_filename_6 = "winsorized.h5"
 
     outlier_sets = [
@@ -97,7 +183,11 @@ def process_outlier(
             traffic_data.start_time = start_datetime
         if end_datetime is not None:
             traffic_data.end_time = end_datetime
+
+        ori_data = traffic_data.data.copy()
         failed_set = traffic_data.remove_outliers(outlier_set)
+        prc_data = traffic_data.data.copy()
+
         failed_list[filename] = list(failed_set)
         output_path = os.path.join(OUTPUT_DIR, filename)
         traffic_data.to_hdf(output_path)
@@ -107,6 +197,6 @@ def process_outlier(
             logger.info(
                 f"Time range: From {traffic_data.data.index[0]} to {traffic_data.data.index[-1]}"
             )
-            
+
     with open(os.path.join(OUTPUT_DIR, "failed_list.yaml"), "w") as f:
         yaml.dump(failed_list, f)

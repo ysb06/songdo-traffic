@@ -9,5 +9,17 @@
 			"console": "integratedTerminal",
 			"justMyCode": false
 		},
+		{
+			"name": "Test RNN Training",
+			"type": "debugpy",
+			"request": "launch",
+			"module": "pytest",
+			"console": "integratedTerminal",
+			"justMyCode": false,
+			"args": [
+				"-s",
+				"tests/results/test_predictions.py",
+			]
+		},
 	]
 }

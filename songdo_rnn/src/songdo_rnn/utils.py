@@ -1,9 +1,32 @@
+from collections import defaultdict
+import glob
 import random
 from typing import Sequence, Tuple, Union
 
 import numpy as np
 import torch
 from sklearn.metrics import mean_absolute_percentage_error
+import yaml
+
+
+def load_results_metrics(prediction_dir: str):
+    targets = glob.glob(f"{prediction_dir}/**/metrics.yaml", recursive=True)
+
+    mae_results = defaultdict(list)
+    rmse_results = defaultdict(list)
+    smape_results = defaultdict(list)
+    mape_results = defaultdict(list)
+    for target in targets:
+        group = target.split("/")[-3]
+        with open(target, "r") as f:
+            result = yaml.safe_load(f)
+
+        mae_results[group].append(result["test_mae"])
+        rmse_results[group].append(result["test_rmse"])
+        smape_results[group].append(result["test_smape"])
+        mape_results[group].append(result["test_mape"])
+
+    return mae_results, rmse_results, smape_results, mape_results
 
 
 def get_auto_device() -> torch.device:
@@ -21,6 +44,9 @@ def non_zero_mape(true: np.ndarray, pred: np.ndarray) -> Tuple[float, bool]:
     pred_filtered = pred[non_zero_mask]
 
     has_zero = not np.all(non_zero_mask)
+
+    if len(true_filtered) == 0 or len(pred_filtered) == 0:
+        return 0, has_zero
 
     mape = mean_absolute_percentage_error(true_filtered, pred_filtered)
 

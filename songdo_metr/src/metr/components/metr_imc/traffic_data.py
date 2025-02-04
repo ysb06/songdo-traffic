@@ -59,10 +59,14 @@ class TrafficData:
             data = pd.read_hdf(filepath, key=key)
         else:
             data = pd.read_hdf(filepath)
-        return TrafficData(data, dtype=dtype)
+
+        return TrafficData(data, dtype=dtype, path=filepath)
 
     def __init__(
-        self, raw: pd.DataFrame, dtype: Optional[Union[str, type]] = None
+        self,
+        raw: pd.DataFrame,
+        dtype: Optional[Union[str, type]] = None,
+        path: Optional[str] = None,
     ) -> None:
         self._raw = raw
         self._raw.sort_index(inplace=True)
@@ -71,6 +75,8 @@ class TrafficData:
         self._raw = self._raw.asfreq(pd.infer_freq(self._raw.index))
         self._verify_data()
         self.reset_data()
+
+        self.path = path
 
     def _as_type(self, data: pd.DataFrame, dtype: Union[str, type]) -> pd.DataFrame:
         if np.issubdtype(np.dtype(dtype), np.integer):
@@ -146,9 +152,9 @@ class TrafficData:
         # Outlier 처리나 Interpolation은 외부로 빼는 것이 좋을 것 같음
         return failed_set
 
-    def interpolate(self, interpolator: Interpolator) -> pd.DataFrame:
+    def interpolate(self, interpolator: Interpolator):
         logger.info("Interpolating METR-IMC Traffic data...")
-        self.data = interpolator.interpolate(self.data)
+        self.data = interpolator._interpolate(self.data)
         logger.info("Interplating Complete")
 
     def to_hdf(self, filepath: str, key: str = "data") -> None:

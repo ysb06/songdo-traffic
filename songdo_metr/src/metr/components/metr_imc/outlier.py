@@ -19,11 +19,7 @@ class OutlierProcessor:
         raise NotImplementedError
 
     def process(self, df: pd.DataFrame) -> pd.DataFrame:
-        original_count = df.count()
-        df_clean = self._process(df)
-        clean_count = df_clean.count()
-        logger.info(f"Outliers removed: {(original_count - clean_count).sum()}")
-
+        df_clean = self._process(df.copy())
         return df_clean
 
 

@@ -30,7 +30,7 @@ from ..test import evaluate_model
 from ..utils import fix_seed, symmetric_mean_absolute_percentage_error, non_zero_mape
 
 OUTPUT_DIR = "./output/predictions"
-TARGET_DATA_PATH = "./output/all_processed"
+TARGET_DATA_PATH = "./output/sync_processed"
 
 logger = logging.getLogger(__name__)
 
