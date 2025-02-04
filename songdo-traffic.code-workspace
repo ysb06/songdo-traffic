@@ -9,11 +9,9 @@
 			"path": "notebooks"
 		},
 		{
-			"name": "songdo_metr",
 			"path": "songdo_metr"
 		},
 		{
-			"name": "songdo_stgcn_wave",
 			"path": "songdo_stgcn_wave"
 		},
 		{
