@@ -22,7 +22,7 @@ from sklearn.metrics import (
 
 import wandb
 
-from ..dataset import TrafficDataModule
+from ..dataset import TrafficRatioDataModule
 from ..model import SongdoTrafficLightningModel
 from ..preprocessing.missing import process_missing
 from ..preprocessing.outlier import process_outlier
@@ -96,7 +96,7 @@ def train_traffic_model(
     model_postfix = f"_{model_postfix}" if model_postfix is not None else ""
 
     # 2. 데이터 모듈 생성
-    data_module = TrafficDataModule(
+    data_module = TrafficRatioDataModule(
         traffic_data_path=traffic_data_path,
         start_datetime=start_datetime,
         end_datetime=end_datetime,
@@ -108,7 +108,7 @@ def train_traffic_model(
     )
 
     # 3. LightningModule 생성
-    model = SongdoTrafficLightningModel(
+    traffic_model = SongdoTrafficLightningModel(
         input_dim=input_dim,
         hidden_dim=hidden_dim,
         num_layers=num_layers,
@@ -164,20 +164,20 @@ def train_traffic_model(
     )
 
     logger.info(f"Training with {run_name}...")
-    trainer.fit(model, datamodule=data_module)
+    trainer.fit(traffic_model, datamodule=data_module)
 
     final_train_loss = trainer.callback_metrics.get("train_loss")
     final_val_loss = trainer.callback_metrics.get("val_loss")
 
     # 5. Predictions
     train_pred, train_true = evaluate_model(
-        model,
+        traffic_model,
         trainer,
         data_module.scaler,
         data_module.train_dataloader(),
     )
     test_pred, test_true = evaluate_model(
-        model,
+        traffic_model,
         trainer,
         data_module.scaler,
         data_module.predict_dataloader(),

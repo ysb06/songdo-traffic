@@ -22,12 +22,6 @@ This section provides a summary of each sub-project. For detailed information su
 
 This project aims to collect traffic data and road network data for Incheon Metropolitan City and generate datasets for training predictive models. The generated datasets include both adjacency matrices representing the spatial structure of roads in Incheon and time series data reflecting traffic volume changes over time. These datasets are designed to be compatible with the well-known METR-LA dataset used in traffic volume prediction. Additionally, this project includes utilities for data correction, such as handling missing values.
 
-### songdo_qgis
-
-이 프로젝트는 교통량 예측 모델 생성에 사용되는 데이터를 QGIS를 통해 시각화하는 것을 목표로 합니다. QGIS 플러그인 형태로 설치되어 실행되는 이 프로젝트를 통해 데이터셋의 특징을 파악하고 및 생성된 모델의 예측 결과를 시각적으로 확인할 수 있습니다.
-
-This project aims to visualize the data used in traffic prediction model creation through QGIS. Installed and run as a QGIS plugin, this project allows users to understand dataset characteristics and visually inspect the prediction results of generated models.
-
 ### songdo_stgcn_wave
 
 [document](./songdo_stgcn_wave/README.md)
@@ -41,6 +35,18 @@ This project aims to create a traffic volume prediction model for Incheon City b
 Jupyter Notebook을 통해 하위 프로젝트를 활용하여 진행한 연구내용들이 포함되어 있습니다.
 
 This directory includes research conducted using the sub-projects, utilizing Jupyter Notebooks.
+
+
+## Todo List
+
+현재 README를 포함하여 전체 프로젝트 구조를 Refactoring이 필요
+
+- Raw Dataset 구축 코드를 songdo_metr에서 metr_dataset으로 변경. 모듈 이름도 metr에서 동일하게 변경
+- Preprocessing (Outlier 및 Missing Value 제거 부분)을 metr_dataset.preprocessing으로 분리
+- 모델 별 Prediction 프로젝트를 metr_pred로 통합
+- 통합 후 테스트
+
+이 Todo는 첫 Paper 완성 후 수행할 것
 
 
 ## License

@@ -30,7 +30,7 @@ def interpolate_missing(
 ):
     interpolators: List[Interpolator] = [
         LinearInterpolator(),
-        # SplineLinearInterpolator(),
+        SplineLinearInterpolator(),
         TimeMeanFillInterpolator(),
         # ShiftFillInterpolator(periods=7),
         MonthlyMeanFillInterpolator(),

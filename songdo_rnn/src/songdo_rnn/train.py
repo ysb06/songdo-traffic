@@ -2,7 +2,7 @@ import os
 from lightning import Trainer
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 
-from .dataset import TrafficDataModule
+from .dataset import TrafficRatioDataModule
 from .model import SongdoTrafficLightningModel
 
 
@@ -24,7 +24,7 @@ def train_model(
     save_path: str = None,
 ):
     # 2. 데이터 모듈 생성
-    data_module = TrafficDataModule(
+    data_module = TrafficRatioDataModule(
         traffic_data_path=traffic_data_path,
         start_datetime=start_datetime,
         end_datetime=end_datetime,

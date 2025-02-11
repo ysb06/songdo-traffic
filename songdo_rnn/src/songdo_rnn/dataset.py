@@ -12,6 +12,115 @@ class TrafficDataModule(L.LightningDataModule):
     def __init__(
         self,
         traffic_data_path: str = "../datasets/metr-imc/metr-imc.h5",
+        training_start_datetime: Optional[str] = "2024-03-01 00:00:00",
+        training_end_datetime: Optional[str] = "2024-07-31 23:00:00",
+        validation_end_datetime: Optional[str] = "2024-08-31 23:00:00",
+        test_end_datetime: Optional[str] = "2024-09-30 23:00:00",
+        target_traffic_sensor: int = 0,
+        seq_length: int = 24,
+        batch_size: int = 64,
+        num_workers: int = 8,
+    ) -> None:
+        super().__init__()
+        self.traffic_data_path = traffic_data_path
+        
+        self.training_start_datetime = training_start_datetime
+        self.training_end_datetime = training_end_datetime
+        self.validation_end_datetime = validation_end_datetime
+        self.test_end_datetime = test_end_datetime
+
+        self.target_traffic_sensor = target_traffic_sensor
+        self.seq_length = seq_length
+        self.batch_size = batch_size
+        self.num_workers = num_workers
+
+        self.raw_dataset: Optional[TrafficDataset] = None
+        self.train_dataset: Optional[TrafficDataset] = None
+        self.valid_dataset: Optional[TrafficDataset] = None
+        self.test_dataset: Optional[TrafficDataset] = None
+        self.scaler: Optional[MinMaxScaler] = None
+
+        self.target_name: Optional[str] = None
+
+    def setup(self, stage: Optional[str] = None) -> None:
+        traffic_data = TrafficData.import_from_hdf(self.traffic_data_path)
+        data_raw = traffic_data.data.iloc[:, self.target_traffic_sensor]
+        data = data_raw.values
+        self.target_name = data_raw.name
+
+        self.raw_dataset = TrafficDataset(data=data, seq_length=self.seq_length)
+        self.scaler = self.raw_dataset.scaler
+            
+        total_length = len(self.raw_dataset)
+        
+        # 마지막 시점의 실제 날짜 인덱스(슬라이싱 관점에서 seq_length-1 만큼 뒤로 간 위치)
+        # 예: idx=0 --> 실제 마지막 시점은 data_raw.index[seq_length-1]
+        #     idx=1 --> 실제 마지막 시점은 data_raw.index[seq_length]
+        timestamps_for_samples = data_raw.index[self.seq_length - 1 : ]  # 길이가 total_length와 동일
+
+        # boolean mask로 구간 나누기
+        train_mask = (
+            (timestamps_for_samples >= self.training_start_datetime) &
+            (timestamps_for_samples <= self.training_end_datetime)
+        )
+        valid_mask = (
+            (timestamps_for_samples > self.training_end_datetime) &
+            (timestamps_for_samples <= self.validation_end_datetime)
+        )
+        test_mask = (
+            (timestamps_for_samples > self.validation_end_datetime) &
+            (timestamps_for_samples <= self.test_end_datetime)
+        )
+
+        # 마스크에 해당하는 인덱스만 추출
+        train_indices = np.where(train_mask)[0]
+        train_indices = train_indices[train_indices < len(self.raw_dataset)]
+        valid_indices = np.where(valid_mask)[0]
+        valid_indices = valid_indices[valid_indices < len(self.raw_dataset)]
+        test_indices = np.where(test_mask)[0]
+        test_indices = test_indices[test_indices < len(self.raw_dataset)]
+        
+        self.train_dataset = Subset(self.raw_dataset, train_indices)
+        self.valid_dataset = Subset(self.raw_dataset, valid_indices)
+        self.test_dataset = Subset(self.raw_dataset, test_indices)
+
+    def train_dataloader(self) -> DataLoader:
+        return DataLoader(
+            self.train_dataset,
+            batch_size=self.batch_size,
+            shuffle=True,
+            # num_workers=self.num_workers,     # worker를 생성하는 과정에서 속도 저하
+        )
+
+    def val_dataloader(self) -> DataLoader:
+        return DataLoader(
+            self.valid_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            # num_workers=self.num_workers,
+        )
+
+    def test_dataloader(self) -> DataLoader:
+        return DataLoader(
+            self.test_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            # num_workers=self.num_workers,
+        )
+
+    def predict_dataloader(self) -> DataLoader:
+        return DataLoader(
+            self.test_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            # num_workers=self.num_workers,
+        )
+
+
+class TrafficRatioDataModule(L.LightningDataModule):
+    def __init__(
+        self,
+        traffic_data_path: str = "../datasets/metr-imc/metr-imc.h5",
         start_datetime: Optional[str] = "2024-03-01 00:00:00",
         end_datetime: Optional[str] = "2024-09-30 23:00:00",
         target_traffic_sensor: int = 0,
@@ -39,14 +148,6 @@ class TrafficDataModule(L.LightningDataModule):
         self.scaler: Optional[MinMaxScaler] = None
 
         self.target_name: Optional[str] = None
-
-    def prepare_data(self) -> None:
-        """
-        Lightning 권장 메서드.
-        데이터 다운로드나 공유 자원 초기화가 필요할 경우 사용.
-        여기서는 이미 데이터를 h5 파일로 가지고 있다고 가정.
-        """
-        pass
 
     def setup(self, stage: Optional[str] = None) -> None:
         traffic_data = TrafficData.import_from_hdf(self.traffic_data_path)

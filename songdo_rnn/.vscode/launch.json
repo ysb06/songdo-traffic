@@ -18,7 +18,7 @@
 			"justMyCode": false,
 			"args": [
 				"-s",
-				"tests/results/test_predictions.py",
+				"tests/test_visualize_by_sensor.py",
 			]
 		},
 	]

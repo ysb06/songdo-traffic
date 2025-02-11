@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Optional
 import pandas as pd
 import seaborn as sns
 import glob
@@ -21,12 +21,15 @@ def plot_loss(prediction_dir: str = PREDICTION_DIR):
     plot_results_metrics(mape_results)
 
 
-def plot_results_metrics(results: Dict[str, List[float]]):
+def plot_results_metrics(results: Dict[str, List[float]], title: Optional[str] = None):
     for group, values in results.items():
         avg = sum(values) / len(values)
         sns.barplot(x=[group], y=[avg])
         print(f"{group}: {avg:.4f}")
 
+    if title is not None:
+        plt.title(title)
+        
     plt.legend()
     plt.show()
 
