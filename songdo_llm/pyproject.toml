@@ -1,0 +1,30 @@
+[project]
+name = "songdo_llm"
+version = "0.1.0"
+description = "Default template for PDM package"
+authors = [{ name = "Seungbin Yim", email = "ysb06@hotmail.com" }]
+dependencies = [
+    "ollama>=0.4.7",
+    "torch>=2.6.0",
+    "transformers>=4.48.3",
+    "protobuf>=5.29.3",
+    "sentencepiece>=0.2.0",
+    "lightning>=2.5.0.post0",
+    "scikit-learn>=1.6.1"
+]
+requires-python = ">=3.11"
+readme = "README.md"
+license = { text = "MIT" }
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+[tool.pdm]
+distribution = true
+
+[tool.pdm.dev-dependencies]
+dev = ["-e file:///${PROJECT_ROOT}/../songdo_metr#egg=songdo-metr"]
+
+[dependency-groups]
+test = ["pytest>=8.3.4"]

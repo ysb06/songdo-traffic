@@ -19,6 +19,9 @@
 		},
 		{
 			"path": "songdo_rnn"
+		},
+		{
+			"path": "songdo_llm"
 		}
 	],
 	"settings": {
