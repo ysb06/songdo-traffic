@@ -272,7 +272,7 @@ def split_train_valid_test(
     dataset: TrafficDataset,
     train_ratio: float = 0.8,
     valid_ratio: float = 0.1,
-    extend_test: bool = True,
+    extend_test: bool = True,   # False가 되어야 함 논문 내용 상
 ) -> Tuple[Subset, Subset, Subset]:
     total_len = len(dataset)
     train_len = round(total_len * train_ratio)

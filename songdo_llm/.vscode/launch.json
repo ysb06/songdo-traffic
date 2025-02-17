@@ -2,12 +2,24 @@
 	"version": "0.2.0",
 	"configurations": [
 		{
-			"name": "Run LLM",
+			"name": "Run LLM Project",
 			"type": "debugpy",
 			"request": "launch",
 			"module": "songdo_llm",
 			"console": "integratedTerminal",
 			"justMyCode": false
 		},
+		{
+			"name": "Run LLM Test",
+			"type": "debugpy",
+			"request": "launch",
+			"module": "pytest",
+			"console": "integratedTerminal",
+			"args": [
+				"-s",
+				"tests/test_simple_prediction.py",
+			],
+			"justMyCode": false
+		}
 	]
 }

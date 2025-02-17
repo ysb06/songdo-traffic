@@ -1,4 +1,4 @@
-from typing import Callable, List, Literal, Optional, Tuple, Union
+from typing import Callable, List, Literal, Optional, Tuple
 import logging
 
 import lightning as L
@@ -6,14 +6,14 @@ import numpy as np
 import pandas as pd
 from metr.components import TrafficData
 from sklearn.preprocessing import MinMaxScaler
-from torch import FloatTensor, Tensor, device
+from torch import Tensor
 import torch
 from torch.utils.data import DataLoader, Dataset, Subset, ConcatDataset
 from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
-CallateFnInput = List[Tuple[np.ndarray, np.ndarray, pd.DatetimeIndex, pd.Timestamp]]
+CollateFnInput = List[Tuple[np.ndarray, np.ndarray, pd.DatetimeIndex, pd.Timestamp]]
 
 
 class TrafficCoreDataset(Dataset):
@@ -125,7 +125,7 @@ class TrafficDataset(TrafficCoreDataset):
 
 
 def collate_fn_all(
-    batch: CallateFnInput,
+    batch: CollateFnInput,
 ) -> Tuple[Tensor, Tensor, List[pd.DatetimeIndex], List[pd.Timestamp]]:
     xs = [item[0] for item in batch]
     ys = [item[1] for item in batch]
@@ -141,7 +141,7 @@ def collate_fn_all(
     return xs_t, ys_t, x_time_indices, y_time_indices
 
 
-def collate_fn_simple(batch: CallateFnInput) -> Tuple[Tensor, Tensor]:
+def collate_fn_simple(batch: CollateFnInput) -> Tuple[Tensor, Tensor]:
     xs = [item[0] for item in batch]
     ys = [item[1] for item in batch]
 
@@ -161,9 +161,10 @@ class BaseTrafficDataModule(L.LightningDataModule):
         seq_length: int = 24,
         batch_size: int = 64,
         num_workers: int = 1,
-        collate_fn: Callable[[CallateFnInput], Tuple] = collate_fn_all,
+        collate_fn: Callable[[CollateFnInput], Tuple] = collate_fn_all,
         valid_split_datetime: Optional[str] = "2024-09-01 00:00:00",
-        test_target_sensor: List[str] = [],
+        training_target_sensor: Optional[List[str]] = None,
+        test_target_sensor: List[str] = ["1610002307", "1610002900", "1630044200"],
         strict_scaling: bool = False,
     ):
         super().__init__()
@@ -174,6 +175,7 @@ class BaseTrafficDataModule(L.LightningDataModule):
 
         self.collate_fn = collate_fn
         self.valid_split_datetime = valid_split_datetime
+        self.training_target_sensor = training_target_sensor
         self.test_target_sensor = test_target_sensor
 
         self.scaler = MinMaxScaler(feature_range=(0, 1))
@@ -181,26 +183,36 @@ class BaseTrafficDataModule(L.LightningDataModule):
 
         # Setup 단계에서 로드 및 초기화
         self.raw_data: Optional[pd.DataFrame] = None
+        self.data_view: Optional[pd.DataFrame] = None
         self.train_dataset: Optional[ConcatDataset] = None
         self.valid_dataset: Optional[ConcatDataset] = None
         self.test_dataset: Optional[ConcatDataset] = None
 
-    def setup(self, _: Optional[Literal["fit", "validate", "test", "predict"]] = None):
-        logger.info(f"Setting up data module")
+    def setup(
+        self, stage: Optional[Literal["fit", "validate", "test", "predict"]] = None
+    ):
+        logger.info(f"Setting up data module in {stage} stage")
         logger.info(f"Loading data from {self.data_path}")
         self.raw_data = TrafficData.import_from_hdf(self.data_path).data
 
+        # Todo: Outlier 및 Missing Value 처리. 단, 학습데이터에만 적용되어야 함
+        # 이 모듈이 아닌 다른 모듈에서 처리하는 것을 고려
+
         # Train, Valid, Test Dataset Split 전략
         # Train과 Test는 센서(열) 기준으로 분리
-        all_sensor_list = self.raw_data.columns
+        logger.info(f"Splitting to test datasets...")
+        if self.training_target_sensor is None:
+            self.data_view = self.raw_data
+        else:
+            self.data_view = self.raw_data.loc[:, self.training_target_sensor]
+        all_sensor_list = self.data_view.columns
         test_sensor_names = set(self.test_target_sensor)
 
-        logger.info(f"Splitting to test datasets...")
         all_datasets: List[TrafficDataset] = []
         train_valid_datasets: List[TrafficDataset] = []
         test_datasets: List[TrafficDataset] = []
         for sensor_name in tqdm(all_sensor_list):
-            sensor_data = self.raw_data[sensor_name]
+            sensor_data = self.data_view[sensor_name]
             dataset = TrafficDataset(sensor_data, seq_length=self.seq_length)
             if not len(dataset) > 0:
                 continue
@@ -218,12 +230,8 @@ class BaseTrafficDataModule(L.LightningDataModule):
         valid_datasets = []
         if self.valid_split_datetime is not None:
             for dataset in tqdm(train_valid_datasets, position=0):
-                train_subset = dataset.get_subset(
-                    end_datetime=self.valid_split_datetime
-                )
-                valid_subset = dataset.get_subset(
-                    start_datetime=self.valid_split_datetime
-                )
+                train_subset = dataset.get_subset(end_datetime=self.valid_split_datetime)
+                valid_subset = dataset.get_subset(start_datetime=self.valid_split_datetime)
 
                 if len(train_subset) > 0:
                     train_datasets.append(train_subset)
@@ -254,7 +262,9 @@ class BaseTrafficDataModule(L.LightningDataModule):
             self.scaler.fit(scaler_ref)
         else:
             train_sensor_names = set(all_sensor_list) - test_sensor_names
-            scaling_target: pd.DataFrame = self.raw_data.loc[:, list(train_sensor_names)]
+            scaling_target: pd.DataFrame = self.raw_data.loc[
+                :, list(train_sensor_names)
+            ]
             if self.valid_split_datetime is not None:
                 scaling_target = scaling_target.loc[: self.valid_split_datetime]
             scaling_target = scaling_target.to_numpy().reshape(-1, 1)
@@ -263,7 +273,7 @@ class BaseTrafficDataModule(L.LightningDataModule):
         logger.info(f"Applying scaler...")
         for dataset in all_datasets:
             dataset.apply_scaler(self.scaler)
-        
+
         logger.info(f"Setup complete")
 
     def train_dataloader(self) -> DataLoader:
@@ -273,6 +283,7 @@ class BaseTrafficDataModule(L.LightningDataModule):
             shuffle=True,
             num_workers=self.num_workers,
             collate_fn=self.collate_fn,
+            persistent_workers=True,
         )
 
     def val_dataloader(self) -> DataLoader:
@@ -282,6 +293,7 @@ class BaseTrafficDataModule(L.LightningDataModule):
             shuffle=False,
             num_workers=self.num_workers,
             collate_fn=self.collate_fn,
+            persistent_workers=True,
         )
 
     def test_dataloader(self) -> DataLoader:
@@ -291,6 +303,7 @@ class BaseTrafficDataModule(L.LightningDataModule):
             shuffle=False,
             num_workers=self.num_workers,
             collate_fn=self.collate_fn,
+            persistent_workers=True,
         )
 
     def predict_dataloader(self) -> DataLoader:
@@ -300,4 +313,5 @@ class BaseTrafficDataModule(L.LightningDataModule):
             shuffle=False,
             num_workers=self.num_workers,
             collate_fn=self.collate_fn,
+            persistent_workers=True,
         )

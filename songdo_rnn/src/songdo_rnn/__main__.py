@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 # process_sync()
 
 # # ----- RNN 학습 ----- 
-# do_experiment(skip_preprocessing=True)
+do_experiment(skip_preprocessing=True)
 # plot_loss()
 # do_evaluation()
 plot_metrics()
