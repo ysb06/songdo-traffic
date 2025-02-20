@@ -16,7 +16,7 @@ from sklearn.preprocessing import MinMaxScaler
 from torch.utils.data import DataLoader
 
 from songdo_llm.dataset import BaseTrafficDataModule
-from songdo_llm.model.lightning.traffic_prediction import TrafficVolumePredictionModule
+from songdo_llm.model.lightning.simple_prediction import TrafficVolumePredictionModule
 
 # Parameters
 epochs = 1
