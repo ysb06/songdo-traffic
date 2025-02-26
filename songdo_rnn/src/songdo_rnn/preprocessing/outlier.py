@@ -30,79 +30,71 @@ METADATA_RAW_PATH = "../datasets/metr-imc/metadata.h5"
 OUTPUT_DIR = "./output/outlier_processed"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-def remove_outliers(data_list: List[TrafficData]):
+
+def remove_base_outliers(
+    start_datetime: Optional[str] = "2023-12-01 00:00:00",
+    end_datetime: Optional[str] = "2024-08-31 23:00:00",
+    traffic_capacity_adjustment_rate: float = 1.5,
+    raw_path: str = TRAFFIC_RAW_PATH,
+    metadata_path: str = METADATA_RAW_PATH,
+    output_dir: str = OUTPUT_DIR,
+    remove_empty: bool = True,
+):
+    raw = TrafficData.import_from_hdf(raw_path).data
+    metadata = Metadata.import_from_hdf(metadata_path)
+    speed_limit_map = metadata.data.set_index("LINK_ID")["MAX_SPD"].to_dict()
+    lane_map = metadata.data.set_index("LINK_ID")["LANES"].to_dict()
+
+    base_proc_1 = RemovingWeirdZeroOutlierProcessor()
+    base_proc_2 = TrafficCapacityAbsoluteOutlierProcessor(
+        speed_limit_map,
+        lane_map,
+        adjustment_rate=traffic_capacity_adjustment_rate,
+    )
+
+    base_data = raw.copy()
+    proc_1_data = base_proc_1.process(base_data)
+    proc_2_data = base_proc_2.process(proc_1_data)
+
+    result = proc_2_data.loc[start_datetime:end_datetime]
+    if remove_empty:
+        result = result.loc[:, result.notna().sum() != 0]
+
+    result_path = os.path.join(output_dir, "base.h5")
+    result.to_hdf(result_path, key="data")
+
+    return result_path
+
+
+def get_outlier_removed_data_list(data_dir: str = OUTPUT_DIR) -> List[TrafficData]:
+    data_path_list = glob(os.path.join(data_dir, "*.h5"))
+
+    return [TrafficData.import_from_hdf(path) for path in data_path_list]
+
+
+def remove_outliers(
+    data: pd.DataFrame,
     outlier_processors: List[OutlierProcessor] = [
         InSensorZscoreOutlierProcessor(threshold=3.0),
         HourlyInSensorZscoreOutlierProcessor(threshold=3.0),
         MADOutlierProcessor(threshold=3.0),
         TrimmedMeanOutlierProcessor(rate=0.05, threshold=3.0),
         WinsorizedOutlierProcessor(rate=0.05, zscore_threshold=3.0),
-    ]
-
-    for data in data_list:
-        for outlier_processor in outlier_processors:
-            outlier_processor_name = outlier_processor.__class__.__name__.lower()
-            outlier_processor_name = outlier_processor_name.removesuffix("outlierprocessor")
-            logger.info(f"Processing with {outlier_processor_name}")
-
-            processed_data = outlier_processor.process(data.data)
-            filename = f"{outlier_processor_name}.h5"
-            filepath = os.path.join(OUTPUT_DIR, filename)
-            processed_data.to_hdf(filepath, key="data")
-
-
-def get_outlier_removed_data_list():
-    data_path_list = glob(os.path.join(OUTPUT_DIR, "*.h5"))
-
-    return [TrafficData.import_from_hdf(path) for path in data_path_list]
-
-
-def remove_base_outliers(
-    start_datetime: Optional[str] = "2023-12-01 00:00:00",
-    end_datetime: Optional[str] = "2024-08-31 23:00:00",
+    ],
+    output_dir: str = OUTPUT_DIR,
 ):
-    raw = TrafficData.import_from_hdf(TRAFFIC_RAW_PATH).data
-    metadata = Metadata.import_from_hdf(METADATA_RAW_PATH)
-    speed_limit_map = metadata.data.set_index("LINK_ID")["MAX_SPD"].to_dict()
-    lane_map = metadata.data.set_index("LINK_ID")["LANES"].to_dict()
+    output_paths = []
+    for processor in outlier_processors:
+        logger.info(f"Processing with {processor.name}")
+        processed_data = processor.process(data)
 
-    base_proc_1 = RemovingWeirdZeroOutlierProcessor()
-    base_proc_2 = TrafficCapacityAbsoluteOutlierProcessor(
-        speed_limit_map, lane_map, adjustment_rate=1.5
-    )
+        filename = f"{processor.name}.h5"
+        filepath = os.path.join(output_dir, filename)
 
-    base_data = raw.copy()
-    base_nan = base_data.isna().sum().sum()
-    logger.info(f"Raw NaN: {base_nan}")
-    base_data_na_cols = base_data.isna().any(axis=0).sum()
-    logger.info(
-        f"Base data{base_data.shape} has {base_data_na_cols} columns with missing values."
-    )
-
-    proc_1_data = base_proc_1.process(base_data)
-    proc_1_nan = proc_1_data.isna().sum().sum()
-    logger.info(
-        f"Raw NaN({base_nan}) - Prc NaN({proc_1_nan}) = {proc_1_nan - base_nan}"
-    )
-    proc_1_data_na_cols = proc_1_data.isna().any(axis=0).sum()
-    logger.info(
-        f"Proc 1{proc_1_data.shape} has {proc_1_data_na_cols} columns have missing values."
-    )
-
-    proc_2_data = base_proc_2.process(proc_1_data)
-    proc_2_nan = proc_2_data.isna().sum().sum()
-    logger.info(
-        f"From({proc_1_nan}) - Prc NaN({proc_2_nan}) = {proc_2_nan - proc_1_nan}"
-    )
-    proc_2_data_na_cols = proc_2_data.isna().any(axis=0).sum()
-    logger.info(
-        f"Proc 2{proc_2_data.shape} has {proc_2_data_na_cols} columns have missing values."
-    )
-
-    # compare_missing_visualization(proc_1_data, proc_2_data)
-
-    result = proc_2_data.loc[start_datetime:end_datetime]
-    result.to_hdf(os.path.join(OUTPUT_DIR, "base_outlier.h5"), key="data")
+        processed_data.to_hdf(filepath, key="data")
+        output_paths.append(filepath)
+    
+    return output_paths
 
 
 # ----- Legacy ----- #

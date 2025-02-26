@@ -12,12 +12,6 @@
 			"path": "songdo_metr"
 		},
 		{
-			"path": "songdo_stgcn_wave"
-		},
-		{
-			"path": "songdo_arima"
-		},
-		{
 			"path": "songdo_rnn"
 		},
 		{

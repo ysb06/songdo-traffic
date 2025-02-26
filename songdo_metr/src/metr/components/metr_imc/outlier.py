@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 class OutlierProcessor:
     def __init__(self):
+        self.name = self.__class__.__name__.lower().removesuffix("outlierprocessor")
         self.successed_list = []
         self.failed_list = []
 
@@ -103,7 +104,7 @@ class SimpleZscoreOutlierProcessor(OutlierProcessor):
             self.successed_list.extend(df.columns)
         else:
             self.failed_list.extend(df.columns)
-            
+
         outliers = np.abs(z_scores) > self.threshold
         return outliers
 
@@ -254,7 +255,7 @@ class TrimmedMeanOutlierProcessor(OutlierProcessor):
 
         zscore = (series - trimmed_mean).abs() / (trimmed_std + self.adjustment)
         series_clean = series.where(zscore <= self.threshold)
-        
+
         return series_clean
 
 
@@ -269,7 +270,9 @@ class WinsorizedOutlierProcessor(OutlierProcessor):
 
     def _apply_threshold_to_series(self, series: pd.Series) -> pd.Series:
         w_data = winsorize(series, limits=[self.rate, self.rate])
-        w_series = pd.Series(w_data, index=series.index, dtype=series.dtype, name=series.name)
+        w_series = pd.Series(
+            w_data, index=series.index, dtype=series.dtype, name=series.name
+        )
 
         w_mean = w_series.mean()
         w_std = w_series.std()

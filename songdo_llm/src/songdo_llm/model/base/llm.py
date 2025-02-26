@@ -12,9 +12,7 @@ import torch.nn as nn
 import torch.optim as optim
 from transformers import (
     DebertaV2ForSequenceClassification,
-    DebertaV2Tokenizer,
-    DebertaV2PreTrainedModel,
-    DebertaV2Model,
+    DebertaV2Tokenizer
 )
 from transformers.modeling_outputs import SequenceClassifierOutput
 import yaml
@@ -56,7 +54,6 @@ class LLMWeight(nn.Module):
             response_text = response.message.content
             self.llm_str_cache[query_key] = response_text
             self.llm_tkn_cache[query_key] = self.tokenizer(response_text, return_tensors="pt")
-
 
         y_2_hat: SequenceClassifierOutput = self.cls_model(**self.llm_tkn_cache[query_key])
 

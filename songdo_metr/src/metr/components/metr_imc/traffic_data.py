@@ -55,6 +55,7 @@ class TrafficData:
         key: Optional[str] = None,
         dtype: Optional[Union[str, type]] = float,
     ) -> "TrafficData":
+        logger.info(f"Loading data from {filepath}...")
         if key is not None:
             data = pd.read_hdf(filepath, key=key)
         else:

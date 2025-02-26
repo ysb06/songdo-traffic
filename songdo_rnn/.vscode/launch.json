@@ -9,17 +9,5 @@
 			"console": "integratedTerminal",
 			"justMyCode": false
 		},
-		{
-			"name": "Test RNN Training",
-			"type": "debugpy",
-			"request": "launch",
-			"module": "pytest",
-			"console": "integratedTerminal",
-			"justMyCode": false,
-			"args": [
-				"-s",
-				"tests/test_visualize_by_sensor.py",
-			]
-		},
 	]
 }
