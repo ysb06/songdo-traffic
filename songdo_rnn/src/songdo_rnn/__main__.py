@@ -5,7 +5,7 @@ from .experiments.best_interpolation_search import do_experiment
 from .experiments.prediction_evaluation import do_evaluation, plot_metrics
 from .preprocessing.outlier import (
     process_outlier,
-    remove_base_outliers,
+    remove_base_outliers_from_file,
     remove_outliers,
     get_outlier_removed_data_list,
 )
@@ -17,7 +17,7 @@ from .plot import plot_loss
 logger = logging.getLogger(__name__)
 
 # # ----- 이상치 처리 ----- 
-remove_base_outliers()
+remove_base_outliers_from_file()
 
 # 주의: 폴더가 비어있는 상태에서 Base만 생성된 상태여야 함
 outlier_base_processed = get_outlier_removed_data_list()

@@ -187,7 +187,7 @@ class HourlyZscoreOutlierProcessor(OutlierProcessor):
     def _process(self, df: pd.DataFrame) -> pd.DataFrame:
         outliers, _ = self._detect_outliers_zscore_df(df, self.threshold)
         if outliers.isna().all().all():
-            raise ValueError("HourlyZscore outliers are all NaN/invalid")
+            raise ValueError("Outliers are all NaN or invalid")
 
         df_clean = df.mask(outliers)
         self.successed_list.extend(df.columns)

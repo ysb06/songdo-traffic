@@ -31,7 +31,7 @@ OUTPUT_DIR = "./output/outlier_processed"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 
-def remove_base_outliers(
+def remove_base_outliers_from_file(
     start_datetime: Optional[str] = "2023-12-01 00:00:00",
     end_datetime: Optional[str] = "2024-08-31 23:00:00",
     traffic_capacity_adjustment_rate: float = 1.5,
@@ -41,6 +41,29 @@ def remove_base_outliers(
     remove_empty: bool = True,
 ):
     raw = TrafficData.import_from_hdf(raw_path).data
+    result = remove_base_outliers(
+        raw,
+        start_datetime=start_datetime,
+        end_datetime=end_datetime,
+        traffic_capacity_adjustment_rate=traffic_capacity_adjustment_rate,
+        metadata_path=metadata_path,
+        remove_empty=remove_empty,
+    )
+
+    result_path = os.path.join(output_dir, "base.h5")
+    result.to_hdf(result_path, key="data")
+
+    return result_path
+
+
+def remove_base_outliers(
+    raw: pd.DataFrame,
+    start_datetime: Optional[str] = "2023-12-01 00:00:00",
+    end_datetime: Optional[str] = "2024-08-31 23:00:00",
+    traffic_capacity_adjustment_rate: float = 1.5,
+    metadata_path: str = METADATA_RAW_PATH,
+    remove_empty: bool = True,
+):
     metadata = Metadata.import_from_hdf(metadata_path)
     speed_limit_map = metadata.data.set_index("LINK_ID")["MAX_SPD"].to_dict()
     lane_map = metadata.data.set_index("LINK_ID")["LANES"].to_dict()
@@ -59,11 +82,8 @@ def remove_base_outliers(
     result = proc_2_data.loc[start_datetime:end_datetime]
     if remove_empty:
         result = result.loc[:, result.notna().sum() != 0]
-
-    result_path = os.path.join(output_dir, "base.h5")
-    result.to_hdf(result_path, key="data")
-
-    return result_path
+    
+    return result
 
 
 def get_outlier_removed_data_list(data_dir: str = OUTPUT_DIR) -> List[TrafficData]:
@@ -93,7 +113,7 @@ def remove_outliers(
 
         processed_data.to_hdf(filepath, key="data")
         output_paths.append(filepath)
-    
+
     return output_paths
 
 
