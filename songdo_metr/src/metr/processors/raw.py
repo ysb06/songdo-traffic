@@ -43,8 +43,8 @@ ADJ_MX_PATH = os.path.join(RAW_DATASET_ROOT_DIR, ADJ_MX_FILENAME)
 def run_process():
     os.makedirs(RAW_MISCELLANEOUS_DIR, exist_ok=True)
 
-    # download_nodelink_raw()
-    # collect_imcrts()
+    download_nodelink_raw()
+    collect_imcrts()
     generate_metr_imc()
     split_traffic_data()
     build_dataset()
@@ -65,7 +65,7 @@ def collect_imcrts():
         start_date=IMCRTS_START_DATE,
         end_date=IMCRTS_END_DATE,
     )
-    collector.collect()
+    collector.collect(ignore_empty=True)
     collector.to_pickle(output_dir=IMCRTS_DIR, file_name=IMCRTS_FILENAME)
     # collector.to_excel(output_dir=IMCRTS_DIR)
     logger.info("Collecting Done")

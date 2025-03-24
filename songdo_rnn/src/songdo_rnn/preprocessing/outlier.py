@@ -79,7 +79,11 @@ def remove_base_outliers(
     proc_1_data = base_proc_1.process(base_data)
     proc_2_data = base_proc_2.process(proc_1_data)
 
-    result = proc_2_data.loc[start_datetime:end_datetime]
+    if start_datetime is not None and end_datetime is not None:
+        result = proc_2_data.loc[start_datetime:end_datetime]
+    else:
+        result = proc_2_data
+
     if remove_empty:
         result = result.loc[:, result.notna().sum() != 0]
     

@@ -32,11 +32,19 @@ class TrafficVolumePredictionModule(L.LightningModule):
         )
         self.criterion = nn.MSELoss()
 
+        self.learning_rate = learning_rate
+        self.lr_step_size = lr_step_size
+        self.lr_gamma = lr_gamma
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.model(x)
 
     def training_step(self, batch, _):
-        x_batch, y_batch, _, _ = batch
+        if len(batch) == 2:
+            x_batch, y_batch = batch
+        else:
+            x_batch, y_batch, _, _ = batch
+            
         outputs = self.model(x_batch)
         loss = self.criterion(outputs, y_batch)
 
@@ -45,7 +53,11 @@ class TrafficVolumePredictionModule(L.LightningModule):
         return loss
 
     def validation_step(self, batch, _):
-        x_batch, y_batch, _, _ = batch
+        if len(batch) == 2:
+            x_batch, y_batch = batch
+        else:
+            x_batch, y_batch, _, _ = batch
+
         outputs = self(x_batch)
         loss = self.criterion(outputs, y_batch)
         self.log("val_loss", loss, prog_bar=True)
@@ -53,7 +65,11 @@ class TrafficVolumePredictionModule(L.LightningModule):
         return loss
 
     def test_step(self, batch, _):
-        x_batch, y_batch, _, _ = batch
+        if len(batch) == 2:
+            x_batch, y_batch = batch
+        else:
+            x_batch, y_batch, _, _ = batch
+            
         outputs = self(x_batch)
         loss = self.criterion(outputs, y_batch)
         self.log("test_loss", loss, prog_bar=True)

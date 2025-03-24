@@ -6,6 +6,9 @@ logger = logging.getLogger(__name__)
 
 
 class Interpolator:
+    def __init__(self) -> None:
+        self.name = self.__class__.__name__
+        
     def _interpolate(self, df: pd.DataFrame) -> pd.DataFrame:
         raise NotImplementedError
 
@@ -43,14 +46,36 @@ class TimeMeanFillInterpolator(Interpolator):
 
 
 class ShiftFillInterpolator(Interpolator):
-    def __init__(self, periods: int = 1) -> None:
+    def __init__(self, periods: int = 168) -> None:
         self.periods = periods
+    
+    def _fill_na_with_shifted(self, s: pd.Series) -> pd.Series:
+        """결측치를 과거 데이터로 채우는 최적화된 함수"""
+        # 결측치가 없으면 빠르게 반환
+        if not s.isna().any():
+            return s
+        
+        s_filled = s.copy()
+        na_indices = s[s.isna()].index
+        values_dict = s.to_dict()
+        min_idx = s.index.min()
+        
+        # 각 결측치에 대해 처리
+        for na_idx in na_indices:
+            shifted_time_idx = na_idx - pd.Timedelta(hours=self.periods)
+            while shifted_time_idx >= min_idx:
+                # 해당 시점에 값이 있고 NaN이 아니면 사용
+                if shifted_time_idx in values_dict and not pd.isna(values_dict[shifted_time_idx]):
+                    s_filled.loc[na_idx] = values_dict[shifted_time_idx]
+                    break
+                # 아닌 경우 다음 기간으로 이동
+                shifted_time_idx -= pd.Timedelta(hours=self.periods)
+        
+        return s_filled
 
     def _interpolate(self, df: pd.DataFrame) -> pd.DataFrame:
-        df_index: pd.DatetimeIndex = df.index
-        df_shifted = df.shift(periods=self.periods, freq=df_index.freq)
-        filled_df = df.where(~df.isna(), df_shifted)
-        return filled_df
+        result = df.apply(self._fill_na_with_shifted, axis=0)
+        return result
 
 
 class MonthlyMeanFillInterpolator(Interpolator):

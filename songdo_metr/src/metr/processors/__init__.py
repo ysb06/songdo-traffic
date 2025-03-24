@@ -12,8 +12,8 @@ NODELINK_TURN_FILENAME = "imc_turninfo.dbf"
 # For IMCRTS Raw Data
 IMCRTS_DIR = "../datasets/metr-imc/imcrts"
 IMCRTS_FILENAME = "imcrts_data.pkl"
-IMCRTS_START_DATE = "20230901"
-IMCRTS_END_DATE = "20240930"
+IMCRTS_START_DATE = "20221101"
+IMCRTS_END_DATE = "20250310"
 INCHEON_REGION_CODES = ["161", "162", "163", "164", "165", "166", "167", "168", "169"]
 
 # For Splitting Training and Test Data

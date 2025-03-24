@@ -1,0 +1,22 @@
+[project]
+name = "songdo-notebooks"
+version = "0.1.0"
+description = "Default template for PDM package"
+authors = [
+    {name = "Seungbin Yim", email = "ysb06@hotmail.com"},
+]
+dependencies = ["geopandas>=1.0.1", "seaborn>=0.13.2", "missingno>=0.5.2", "ipykernel>=6.29.5", "folium>=0.19.5", "mapclassify>=2.8.1", "wandb>=0.19.8"]
+requires-python = "==3.11.*"
+readme = "README.md"
+license = {text = "MIT"}
+
+
+[tool.pdm]
+distribution = false
+
+[tool.pdm.dev-dependencies]
+dev = [
+    "-e file:///${PROJECT_ROOT}/../songdo_metr#egg=songdo-metr",
+    "-e file:///${PROJECT_ROOT}/../songdo_llm#egg=songdo-llm",
+    "-e file:///${PROJECT_ROOT}/../songdo_rnn#egg=songdo-rnn",
+]

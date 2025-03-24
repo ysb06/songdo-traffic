@@ -18,9 +18,35 @@ import matplotlib.pyplot as plt
 
 OUTLIER_PROCESSED_DIR = "./output/outlier_processed"
 OUTPUT_DIR = "./output/missing_processed"
-os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 logger = logging.getLogger(__name__)
+
+
+def interpolate(
+    data_list: List[TrafficData],
+    interpolators: List[Interpolator],
+    output_dir: str = OUTPUT_DIR,
+):
+    output_paths = []
+    for raw_data in data_list:
+        data = raw_data.data
+        data_basename = os.path.basename(raw_data.path if raw_data.path else "unknown")
+        data_basename = data_basename.removesuffix(".h5")
+
+        for interpolator in interpolators:
+            interpolator_name = interpolator.name
+            filepath = os.path.join(
+                output_dir, f"{data_basename}-{interpolator_name}.h5"
+            )
+        
+            logger.info(f"Interpolating {data_basename} with {interpolator_name}...")
+            interpolated_data = interpolator.interpolate(data)
+            logger.info(f"Saving...")
+            interpolated_data.to_hdf(filepath, key="data")
+            output_paths.append(filepath)
+            logger.info(f"Saved to {filepath}")
+    
+    return output_paths
 
 
 def interpolate_missing(
@@ -49,7 +75,9 @@ def interpolate_missing(
             interpolated_data = interpolator.interpolate(data)
             interpolated_data = interpolated_data.loc[start_datetime:end_datetime]
 
-            filepath = os.path.join(OUTPUT_DIR, f"{data_basename}-{interpolator_name}.h5")
+            filepath = os.path.join(
+                OUTPUT_DIR, f"{data_basename}-{interpolator_name}.h5"
+            )
             interpolated_data.to_hdf(filepath, key="data")
             logger.info(f"Interpolated data saved to {filepath}")
 

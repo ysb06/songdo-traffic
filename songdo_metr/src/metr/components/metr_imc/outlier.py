@@ -27,7 +27,6 @@ class OutlierProcessor:
 class RemovingWeirdZeroOutlierProcessor(OutlierProcessor):
     def _process(self, df: pd.DataFrame) -> pd.DataFrame:
         def extend_nans_around_zeros(series: pd.Series) -> pd.Series:
-            series = series.copy()
             nan_indices = series[series.isna()].index
 
             for idx in nan_indices:

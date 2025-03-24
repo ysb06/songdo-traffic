@@ -5,7 +5,6 @@ import os
 from metr.components import TrafficData
 from metr.components.metr_imc.interpolation import (
     LinearInterpolator,
-    SplineInterpolator,
     SplineLinearInterpolator,
     TimeMeanFillInterpolator,
 )
@@ -43,7 +42,6 @@ def interpolate(
     processor_set = [
         (LinearInterpolator(), "linear"),  # Linear Interpolation
         (SplineLinearInterpolator(), "spline_linear"),  # Spline Linear Interpolation??
-        (SplineInterpolator(n_jobs=8), "spline"),  # 3rd Order Spline Interpolation
         (TimeMeanFillInterpolator(), "time_mean_fill"),  # Time Mean Fill Interpolation
     ]
 

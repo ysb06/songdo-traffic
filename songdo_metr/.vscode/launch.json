@@ -1,0 +1,13 @@
+{
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"name": "Build Raw Dataset",
+			"type": "debugpy",
+			"request": "launch",
+			"module": "metr",
+			"console": "integratedTerminal",
+			"justMyCode": false
+		}
+	]
+}
