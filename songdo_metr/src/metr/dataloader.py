@@ -1,161 +1,229 @@
-import torch
-from torch.utils.data import Dataset, DataLoader, Subset
-import pandas as pd
-from sklearn.preprocessing import StandardScaler
-from typing import Optional, Tuple, Union
 import logging
+from typing import Callable, List, Literal, Optional, Tuple
+
+import lightning as L
+import numpy as np
+import pandas as pd
+import torch
+from sklearn.preprocessing import MinMaxScaler
+from torch import Tensor
+from torch.utils.data import ConcatDataset, DataLoader, Subset
+from tqdm import tqdm
+
+from metr.datasets import TrafficDataset, TrafficDataType
 
 logger = logging.getLogger(__name__)
 
+CollateFnInput = List[TrafficDataType]
 
-class MetrDataset(Dataset):
-    @staticmethod
-    def from_file(
-        data_path: str,
-        history_len: int,
-        prediction_len: int,
-        missing_value_path: Optional[str] = None,
-    ) -> "MetrDataset":
-        return MetrDataset(
-            pd.read_hdf(data_path),
-            history_len,
-            prediction_len,
-            pd.read_hdf(missing_value_path) if missing_value_path else None,
-        )
 
-    @staticmethod
-    def collate_fn(batch):
-        x_batch = torch.stack([item[0] for item in batch])
-        y_batch = torch.stack([item[1] for item in batch])
+def collate_all(
+    batch: CollateFnInput,
+) -> Tuple[Tensor, Tensor, List[pd.DatetimeIndex], List[pd.Timestamp]]:
+    xs = [item[0] for item in batch]
+    ys = [item[1] for item in batch]
+    x_time_indices = [item[2] for item in batch]
+    y_time_indices = [item[3] for item in batch]
 
-        return x_batch, y_batch
+    xs_t = [torch.from_numpy(x).float() for x in xs]
+    ys_t = [torch.from_numpy(y).float() for y in ys]
 
-    @staticmethod
-    def collate_fn_with_missing(batch):
-        x_batch = torch.stack([item[0] for item in batch])
-        y_batch = torch.stack([item[1] for item in batch])
-        # May error occur if missing_y_batch is None
-        missing_y_batch = torch.stack([item[5] for item in batch])
+    xs_t = torch.stack(xs_t, dim=0)
+    ys_t = torch.stack(ys_t, dim=0)
 
-        return x_batch, y_batch, missing_y_batch
+    return xs_t, ys_t, x_time_indices, y_time_indices
 
-    @staticmethod
-    def collate_fn_debug(batch):
-        x_batch = torch.stack([item[0] for item in batch])
-        y_batch = torch.stack([item[1] for item in batch])
-        raw_x_batch = torch.stack([item[2] for item in batch])
-        raw_y_batch = torch.stack([item[3] for item in batch])
-        missing_x_batch = torch.stack([item[4] for item in batch])
-        missing_y_batch = torch.stack([item[5] for item in batch])
 
-        return (
-            x_batch,
-            y_batch,
-            raw_x_batch,
-            raw_y_batch,
-            missing_x_batch,
-            missing_y_batch,
-        )
+def collate_simple(batch: CollateFnInput) -> Tuple[Tensor, Tensor]:
+    xs = [item[0] for item in batch]
+    ys = [item[1] for item in batch]
 
+    xs_t = [torch.from_numpy(x).float() for x in xs]
+    ys_t = [torch.from_numpy(y).float() for y in ys]
+
+    xs_t = torch.stack(xs_t, dim=0)
+    ys_t = torch.stack(ys_t, dim=0)
+
+    return xs_t, ys_t
+
+
+class TrafficDataModule(L.LightningDataModule):
     def __init__(
         self,
-        data_df: pd.DataFrame,
-        history_len: int,
-        prediction_len: int,
-        missing_df: Optional[pd.DataFrame] = None,
-    ) -> None:
+        training_df: pd.DataFrame,
+        test_df: pd.DataFrame,
+        seq_length: int = 24,
+        batch_size: int = 64,
+        num_workers: int = 1,
+        shuffle_training: bool = True,
+        scaler: MinMaxScaler = MinMaxScaler(feature_range=(0, 1)),
+        collate_fn: Callable[[CollateFnInput], Tuple] = collate_simple,
+        valid_split_datetime: Optional[str] = "2024-08-01 00:00:00",
+        training_target_sensor: Optional[List[str]] = None,
+        scale_strictly: bool = False,
+    ):
         super().__init__()
-        self.raw_df = data_df
-        self.num_samples, self.num_nodes = self.raw_df.shape
-        self.history_len = history_len
-        self.prediction_offset = prediction_len
-        self.missing_df = missing_df
-        if self.missing_df is None:
-            logger.warning(
-                "No missing value label. This may cause errors or incorrect calculations for some metrics."
+        self.training_df_raw = training_df
+        self.test_df_raw = test_df
+
+        self.seq_length = seq_length
+        self.batch_size = batch_size
+        self.num_workers = num_workers
+
+        self.shuffle_training = shuffle_training
+
+        self.collate_fn = collate_fn
+        self.valid_split_datetime = valid_split_datetime
+        self.training_target_sensor = training_target_sensor
+
+        self.scaler = scaler
+        self.scale_strictly = scale_strictly
+
+        # Setup 단계에서 로드 및 초기화
+        self.train_dataset: Optional[ConcatDataset] = None
+        self.valid_dataset: Optional[ConcatDataset] = None
+        self.test_dataset: Optional[ConcatDataset] = None
+
+    def _create_datasets(self, df: pd.DataFrame) -> List[TrafficDataset]:
+        datasets: List[TrafficDataset] = []
+        for sensor_name, sensor_data in tqdm(df.items(), total=len(df.columns), desc="Creating datasets..."):
+            dataset = TrafficDataset(
+                sensor_data,
+                seq_length=self.seq_length,
+                allow_nan=False,
             )
+            if not len(dataset) > 0:
+                logger.warning(f"Dataset {sensor_name} is empty")
+                continue
+            datasets.append(dataset)
 
-        # 스케일러 적용
-        self.scaler_for_all = StandardScaler().fit(self.raw_df)
-        logger.info(f"Fitting StandardScaler(All) Complete")
-        scaled_data = self.scaler_for_all.transform(self.raw_df)
-        self.raw_data = torch.tensor(self.raw_df.to_numpy(), dtype=torch.int32)
-        self.data = torch.tensor(scaled_data, dtype=torch.float32)
-        self.missings_data = (
-            torch.tensor(self.missing_df.to_numpy())
-            if self.missing_df is not None
-            else None
-        )
+        return datasets
 
-    def __len__(self) -> int:
-        return self.num_samples - self.history_len - self.prediction_offset
+    def _split_datasets(self, datasets: List[TrafficDataset], split_datetime: str):
+        train_subsets: List[Subset] = []
+        valid_subsets: List[Subset] = []
 
-    def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor]:
-        x = self.data[index : index + self.history_len]
-        y = self.data[index + self.history_len + self.prediction_offset - 1]
-        raw_x = self.raw_data[index : index + self.history_len]
-        raw_y = self.raw_data[index + self.history_len + self.prediction_offset - 1]
-        if self.missing_df is None:
-            return x.unsqueeze(0), y, raw_x.unsqueeze(0), raw_y
-        else:
-            missing_x = self.missings_data[index : index + self.history_len]
-            missing_y = self.missings_data[
-                index + self.history_len + self.prediction_offset - 1
-            ]
-            return x.unsqueeze(0), y, raw_x.unsqueeze(0), raw_y, missing_x, missing_y
+        for dataset in datasets:
+            train_subset = dataset.get_subset(end_datetime=split_datetime)
+            valid_subset = dataset.get_subset(start_datetime=split_datetime)
+            if len(train_subset) > 0:
+                train_subsets.append(train_subset)
+            if len(valid_subset) > 0:
+                valid_subsets.append(valid_subset)
 
-    @property
-    def is_missing_value_labeled(self):
-        return self.missing_df is not None
+        return train_subsets, valid_subsets
 
-    def split(
+    def _get_strict_scaler_ref(self, dataset: TrafficDataset):
+        x_list = []
+        y_list = []
+        for x, y, *_ in tqdm(dataset, desc="Creating strict scaler reference..."):
+            x_list.append(x)
+            y_list.append(y.reshape(1, 1))
+        scaler_ref = np.concatenate(x_list + y_list, axis=0).reshape(-1, 1)
+
+        return scaler_ref
+
+    def _get_normal_scaler_ref(self, ref_raw_df: pd.DataFrame, end_datetime: str):
+        scaling_target: pd.DataFrame = ref_raw_df.loc[:, ref_raw_df.columns]
+        if self.valid_split_datetime is not None:
+            scaling_target = scaling_target.loc[:end_datetime]
+
+        return scaling_target.to_numpy().reshape(-1, 1)
+
+    def setup(
         self,
-        train_ratio: float = 0.7,
-        valid_ratio: float = 0.1,
-        allow_training_overlap: bool = False,
-        allow_test_overlap: bool = False,
-    ) -> Tuple[Subset, Subset, Subset, StandardScaler]:
-        """
-        Splits the dataset into training, validation, and test subsets, with optional control over overlap between the subsets.
+        stage: Optional[Literal["fit", "validate", "test", "predict"]] = None,
+    ):
+        logger.info(f"Setting up data module in {stage} stage")
 
-        Args:
-            train_ratio (float): The proportion of the dataset to be used for training. Defaults to 0.7.
-            valid_ratio (float): The proportion of the dataset to be used for validation. The test set ratio is automatically 
-                                determined as the remaining portion after training and validation. Defaults to 0.1.
-            allow_training_overlap (bool): If True, allows overlap between the end of the training data and the start of the 
-                                        validation data. If False, ensures that the validation data starts after the history 
-                                        and prediction window of the training data. Defaults to False.
-            allow_test_overlap (bool): If True, allows overlap between the end of the validation data and the start of the 
-                                    test data. If False, ensures that the test data starts after the history and prediction 
-                                    window of the validation data. Defaults to False.
+        # 데이터셋 생성
+        # training_df_raw에서 training_target_sensor에 해당하는 데이터만 사용
+        # training_target_sensor가 None이면 전체 데이터 사용
+        training_targets: pd.DataFrame = self.training_df_raw
+        if self.training_target_sensor is not None:
+            training_targets = self.training_df_raw.loc[:, self.training_target_sensor]
 
-        Returns:
-            Tuple[Subset,Subset,Subset,StandardScaler]: 
-                - train_subset (Subset): The training subset of the dataset.
-                - val_subset (Subset): The validation subset of the dataset.
-                - test_subset (Subset): The test subset of the dataset.
-                - split_scaler (StandardScaler): A scaler fitted on the training data, which is applied to the entire dataset.
-        """
+        all_datasets: List[TrafficDataset] = []
+        # Train, Valid 데이터셋 생성
+        training_datasets = self._create_datasets(training_targets)
+        all_datasets.extend(training_datasets)
+        # Test 데이터셋 생성
+        test_datasets = self._create_datasets(self.test_df_raw)
+        all_datasets.extend(test_datasets)
 
-        len_train = round(self.num_samples * train_ratio)
-        len_valid = round(self.num_samples * valid_ratio)
+        # Train과 Valid는 시간 기준으로 분리
+        # 마지막 달이 Valid 데이터
+        logger.info(f"Splitting to valid datasets...")
+        training_subsets = []
+        validation_subsets = []
+        if self.valid_split_datetime is not None:
+            training_subsets, validation_subsets = self._split_datasets(
+                training_datasets,
+                self.valid_split_datetime,
+            )
+        else:
+            training_subsets = training_datasets
 
-        total_indices = list(range(len(self)))
-        valid_offset = self.history_len + self.prediction_offset if not allow_training_overlap else 0
-        test_offset = self.history_len + self.prediction_offset if not allow_test_overlap else 0
-        train_indices = total_indices[: len_train]
-        valid_indices = total_indices[len_train + valid_offset : len_train + len_valid + valid_offset]
-        test_indices = total_indices[len_train + len_valid + valid_offset + test_offset:]
+        # 모두 연결
+        # 이상치는 모두 제거된 상태여야 함
+        logger.info(f"Concatenating datasets...")
+        self.train_dataset = ConcatDataset(training_subsets)
+        if len(validation_subsets) > 0:
+            self.valid_dataset = ConcatDataset(validation_subsets)
+        if len(test_datasets) > 0:
+            self.test_dataset = ConcatDataset(test_datasets)
 
-        train_df = self.raw_df.iloc[total_indices[:len_train]]
-        split_scaler = StandardScaler().fit(train_df)
-        logger.info(f"Fitting StandardScaler(Training) Complete")
-        self.data = torch.tensor(
-            split_scaler.transform(self.raw_df), dtype=torch.float32
+        # Scaler 적용
+        logger.info(f"Fitting scaler...")
+        ref_data: Optional[np.ndarray] = None
+        if self.scale_strictly:
+            # 엄밀하게는 이렇게 해야하지만, 너무 오래 걸림
+            ref_data = self._get_strict_scaler_ref(self.train_dataset)
+        else:
+            end_datetime = self.valid_split_datetime
+            if self.valid_split_datetime is None:
+                end_datetime = training_targets.index[-1]
+            ref_data = self._get_normal_scaler_ref(self.training_df_raw, end_datetime)
+        self.scaler.fit(ref_data)
+
+        logger.info(f"Applying scaler...")
+        for dataset in all_datasets:
+            dataset.apply_scaler(self.scaler)
+
+        logger.info(f"Setup complete")
+
+    def train_dataloader(self) -> DataLoader:
+        return DataLoader(
+            self.train_dataset,
+            batch_size=self.batch_size,
+            shuffle=self.shuffle_training,
+            num_workers=self.num_workers,
+            collate_fn=self.collate_fn
         )
 
-        train_subset = Subset(self, train_indices)
-        val_subset = Subset(self, valid_indices)
-        test_subset = Subset(self, test_indices)
+    def val_dataloader(self) -> DataLoader:
+        return DataLoader(
+            self.valid_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=self.num_workers,
+            collate_fn=self.collate_fn
+        )
 
-        return train_subset, val_subset, test_subset, split_scaler
+    def test_dataloader(self) -> DataLoader:
+        return DataLoader(
+            self.test_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=self.num_workers,
+            collate_fn=self.collate_fn
+        )
+
+    def predict_dataloader(self) -> DataLoader:
+        return DataLoader(
+            self.test_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=self.num_workers,
+            collate_fn=self.collate_fn
+        )

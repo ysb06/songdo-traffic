@@ -211,7 +211,7 @@ class TrafficDataModule(L.LightningDataModule):
         # Train, Valid 데이터셋 생성
         train_valid_datasets: List[TrafficDataset] = []
         test_datasets: List[TrafficDataset] = []
-        for sensor_name in tqdm(all_sensor_list):
+        for sensor_name in tqdm(all_sensor_list, desc="Creating train-valid datasets..."):
             sensor_data = self.data_view[sensor_name]
             dataset = TrafficDataset(sensor_data, seq_length=self.seq_length)
             if not len(dataset) > 0:
@@ -222,7 +222,7 @@ class TrafficDataModule(L.LightningDataModule):
         
         # Test 데이터셋 생성
         test_sensor_names = set(self.test_df.columns)
-        for sensor_name in test_sensor_names:
+        for sensor_name in tqdm(test_sensor_names, desc="Creating test datasets..."):
             sensor_data = self.test_df[sensor_name]
             dataset = TrafficDataset(sensor_data, seq_length=self.seq_length)
             if not len(dataset) > 0:
@@ -238,7 +238,7 @@ class TrafficDataModule(L.LightningDataModule):
         train_datasets = []
         valid_datasets = []
         if self.valid_split_datetime is not None:
-            for dataset in tqdm(train_valid_datasets):
+            for dataset in tqdm(train_valid_datasets, desc="Splitting to valid datasets..."):
                 train_subset = dataset.get_subset(end_datetime=self.valid_split_datetime)
                 valid_subset = dataset.get_subset(start_datetime=self.valid_split_datetime)
 
@@ -264,7 +264,7 @@ class TrafficDataModule(L.LightningDataModule):
             # 엄밀하게는 이렇게 해야하지만, 너무 오래 걸림
             x_list = []
             y_list = []
-            for x, y, *_ in tqdm(self.train_dataset):
+            for x, y, *_ in tqdm(self.train_dataset, desc="Creating strict scaler reference..."):
                 x_list.append(x)
                 y_list.append(y.reshape(1, 1))
             scaler_ref = np.concatenate(x_list + y_list, axis=0).reshape(-1, 1)
@@ -289,10 +289,9 @@ class TrafficDataModule(L.LightningDataModule):
         return DataLoader(
             self.train_dataset,
             batch_size=self.batch_size,
-            shuffle=True,
+            shuffle=False,
             num_workers=self.num_workers,
-            collate_fn=self.collate_fn,
-            persistent_workers=True,
+            collate_fn=self.collate_fn
         )
 
     def val_dataloader(self) -> DataLoader:
@@ -301,8 +300,7 @@ class TrafficDataModule(L.LightningDataModule):
             batch_size=self.batch_size,
             shuffle=False,
             num_workers=self.num_workers,
-            collate_fn=self.collate_fn,
-            persistent_workers=True,
+            collate_fn=self.collate_fn
         )
 
     def test_dataloader(self) -> DataLoader:
@@ -311,8 +309,7 @@ class TrafficDataModule(L.LightningDataModule):
             batch_size=self.batch_size,
             shuffle=False,
             num_workers=self.num_workers,
-            collate_fn=self.collate_fn,
-            persistent_workers=True,
+            collate_fn=self.collate_fn
         )
 
     def predict_dataloader(self) -> DataLoader:
@@ -321,8 +318,7 @@ class TrafficDataModule(L.LightningDataModule):
             batch_size=self.batch_size,
             shuffle=False,
             num_workers=self.num_workers,
-            collate_fn=self.collate_fn,
-            persistent_workers=True,
+            collate_fn=self.collate_fn
         )
 
 

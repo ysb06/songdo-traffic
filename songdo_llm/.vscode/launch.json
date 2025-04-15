@@ -17,7 +17,7 @@
 			"console": "integratedTerminal",
 			"args": [
 				"-s",
-				"tests/test_llm_model.py",
+				"tests/test_dataset.py",
 			],
 			"justMyCode": false
 		}
