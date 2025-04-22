@@ -9,7 +9,12 @@
 			"path": "notebooks"
 		},
 		{
-			"path": "songdo_metr"
+			"path": "songdo_metr",
+			"name": "METR Dataset"
+		},
+		{
+			"path": "project_om",
+			"name": "Project Outliers & Missings"
 		},
 		{
 			"path": "songdo_rnn"

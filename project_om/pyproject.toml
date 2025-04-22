@@ -1,11 +1,11 @@
 [project]
-name = "notebooks"
+name = "project_om"
 version = "0.1.0"
 description = "Default template for PDM package"
 authors = [
     {name = "Seungbin Yim", email = "ysb06@hotmail.com"},
 ]
-dependencies = []
+dependencies = ["seaborn>=0.13.2", "matplotlib>=3.10.1"]
 requires-python = "==3.11.*"
 readme = "README.md"
 license = {text = "MIT"}
@@ -13,3 +13,8 @@ license = {text = "MIT"}
 
 [tool.pdm]
 distribution = false
+
+[tool.pdm.dev-dependencies]
+dev = [
+    "-e file:///${PROJECT_ROOT}/../songdo_metr#egg=songdo-metr",
+]
