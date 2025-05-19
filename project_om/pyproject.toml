@@ -5,7 +5,7 @@ description = "Default template for PDM package"
 authors = [
     {name = "Seungbin Yim", email = "ysb06@hotmail.com"},
 ]
-dependencies = ["seaborn>=0.13.2", "matplotlib>=3.10.1"]
+dependencies = ["seaborn>=0.13.2", "matplotlib>=3.10.1", "songdo-llm @ file:///${PROJECT_ROOT}/../songdo_llm"]
 requires-python = "==3.11.*"
 readme = "README.md"
 license = {text = "MIT"}
@@ -17,4 +17,5 @@ distribution = false
 [tool.pdm.dev-dependencies]
 dev = [
     "-e file:///${PROJECT_ROOT}/../songdo_metr#egg=songdo-metr",
+    "-e file:///${PROJECT_ROOT}/../songdo_llm#egg=songdo-llm",
 ]

@@ -13,7 +13,8 @@ INTERPOLATED_STEST_DATA_DIR = os.path.join(INTERPOLATED_OUTPUT_DIR, "stest")
 INTERPOLATED_PTEST_DATA_DIR = os.path.join(INTERPOLATED_OUTPUT_DIR, "ptest")
 
 RAW_DATA_PATH = "../datasets/metr-imc/metr-imc.h5"
-BASE_DATA_PATH = os.path.join(OUTLIER_OUTPUT_DIR, "base.h5")
+METADATA_RAW_PATH = "../datasets/metr-imc/metadata.h5"
+BASE_DATA_PATH = os.path.join(OUTLIER_PTEST_DATA_DIR, "base.h5")
 
 for dir_path in [
     OUTLIER_OUTPUT_DIR,

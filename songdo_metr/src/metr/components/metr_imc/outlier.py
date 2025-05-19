@@ -20,6 +20,7 @@ class OutlierProcessor:
         raise NotImplementedError
 
     def process(self, df: pd.DataFrame) -> pd.DataFrame:
+        logger.info(f"Processing {self.name}...")
         df_clean = self._process(df.copy())
         return df_clean
 
@@ -76,9 +77,19 @@ class TrafficCapacityAbsoluteOutlierProcessor(OutlierProcessor):
     def _get_road_capacity(self, road_name: str) -> float:
         speed_limit = self.road_speed_limits[road_name]
         lane_count = self.lane_counts[road_name]
-        alpha = 10 * (100 - speed_limit)
-        if speed_limit > 100:
-            alpha /= 2
+        # alpha = 10 * (100 - speed_limit)
+        # if speed_limit > 100:
+        #     alpha /= 2
+        if speed_limit >= 120:
+            alpha = -100
+        elif speed_limit >= 100:
+            alpha = 0
+        elif speed_limit >= 80:
+            alpha = 200
+        # 위 식은 도로용량편람(2013)에 의거 명시된 도로용량만 처리하도록 제한
+        # https://jhtwin25.tistory.com/12 80km/h 이하 도로는 다차로 도로로서 2000이하로 처리함이 명시되어 있음
+        # 도로의 세부적인 서비스 수준은 고려할 수 없으므로 모든 도로에 대해 이상적인 값으로 처리
+        # 신호등이 있는 경우도 이상적으로 신호에 영향을 받지 않는다고 가정
         return (2200 - alpha) * lane_count * self.adjustment_rate
 
     def _process_road_data(self, series: pd.Series) -> pd.Series:
