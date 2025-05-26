@@ -17,10 +17,8 @@
 			"name": "Project Outliers & Missings"
 		},
 		{
-			"path": "songdo_rnn"
-		},
-		{
-			"path": "songdo_llm"
+			"name": "Legacy Code",
+			"path": "../songdo-traffic-legacy"
 		}
 	],
 	"settings": {
