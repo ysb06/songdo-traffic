@@ -67,12 +67,11 @@ class TrafficCapacityAbsoluteOutlierProcessor(OutlierProcessor):
         self,
         road_speed_limits: Dict[str, int],
         lane_counts: Dict[str, int],
-        adjustment_rate: float = 1.0,
+        adjustment_rate: float = 1.0,   # Deprecated
     ) -> None:
         super().__init__()
         self.road_speed_limits = road_speed_limits
         self.lane_counts = lane_counts
-        self.adjustment_rate = adjustment_rate
 
     def _get_road_capacity(self, road_name: str) -> float:
         speed_limit = self.road_speed_limits[road_name]
@@ -80,17 +79,18 @@ class TrafficCapacityAbsoluteOutlierProcessor(OutlierProcessor):
         # alpha = 10 * (100 - speed_limit)
         # if speed_limit > 100:
         #     alpha /= 2
-        if speed_limit >= 120:
-            alpha = -100
-        elif speed_limit >= 100:
-            alpha = 0
-        elif speed_limit >= 80:
-            alpha = 200
+        if speed_limit <= 80:
+            max_capacity = 3000
+        elif speed_limit <= 100:
+            max_capacity = 3300
+        else:
+            max_capacity = 3450
         # 위 식은 도로용량편람(2013)에 의거 명시된 도로용량만 처리하도록 제한
         # https://jhtwin25.tistory.com/12 80km/h 이하 도로는 다차로 도로로서 2000이하로 처리함이 명시되어 있음
         # 도로의 세부적인 서비스 수준은 고려할 수 없으므로 모든 도로에 대해 이상적인 값으로 처리
         # 신호등이 있는 경우도 이상적으로 신호에 영향을 받지 않는다고 가정
-        return (2200 - alpha) * lane_count * self.adjustment_rate
+        # return (2200 - alpha) * lane_count * self.adjustment_rate
+        return max_capacity * lane_count
 
     def _process_road_data(self, series: pd.Series) -> pd.Series:
         road_name = series.name
@@ -164,6 +164,28 @@ class HourlyInSensorZscoreOutlierProcessor(OutlierProcessor):
         return df_clean
 
 
+class MonthlyHourlyInSensorZscoreOutlierProcessor(OutlierProcessor):
+    def __init__(self, threshold: float = 3.0) -> None:
+        super().__init__()
+        self.threshold = threshold
+
+    def _process(self, df: pd.DataFrame) -> pd.DataFrame:
+        def zscore_within_group(x: pd.Series) -> pd.Series:
+            return (x - x.mean()) / x.std()
+
+        # 월과 시간 모두로 그룹화
+        grouped: DataFrameGroupBy = df.groupby([df.index.month, df.index.hour])
+        zscored: pd.DataFrame = grouped.transform(zscore_within_group)
+
+        if zscored.isna().all().all():
+            self.successed_list.extend(df.columns)
+        else:
+            self.failed_list.extend(df.columns)
+
+        df_clean = df.mask(zscored.abs() > self.threshold)
+        return df_clean
+
+
 class HourlyZscoreOutlierProcessor(OutlierProcessor):
     def __init__(self, threshold: float = 3.0) -> None:
         super().__init__()
@@ -205,7 +227,7 @@ class HourlyZscoreOutlierProcessor(OutlierProcessor):
 
 
 class MADOutlierProcessor(OutlierProcessor):
-    def __init__(self, threshold: float = 3, adjustment: float = 1e-9) -> None:
+    def __init__(self, threshold: float = 3.5, adjustment: float = 1e-9) -> None:
         super().__init__()
         self.threshold = threshold
         self.adjustment = adjustment
@@ -223,8 +245,8 @@ class MADOutlierProcessor(OutlierProcessor):
         else:
             self.successed_list.append(series.name)
 
-        mad_z_score = deviation / (mad + self.adjustment)
-        series_clean = series.where(mad_z_score <= self.threshold)
+        modified_z_score = 0.6745 * deviation / (mad + self.adjustment)
+        series_clean = series.where(modified_z_score <= self.threshold)
 
         return series_clean
 
@@ -236,7 +258,7 @@ class TrimmedMeanOutlierProcessor(OutlierProcessor):
         threshold: float = 3,
         adjustment: float = 1e-9,
     ) -> None:
-        super().__init__()  # [MODIFIED PART] 부모 초기화
+        super().__init__()
         self.threshold = threshold
         self.adjustment = adjustment
         self.rate = rate

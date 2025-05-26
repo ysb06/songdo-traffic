@@ -2,8 +2,8 @@ import argparse
 import logging
 import os
 from copy import deepcopy
-from typing import Dict, List, Tuple
 from glob import glob
+from typing import Dict, List, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -22,6 +22,7 @@ from metr.components.metr_imc.outlier import (
     HourlyInSensorZscoreOutlierProcessor,
     InSensorZscoreOutlierProcessor,
     MADOutlierProcessor,
+    MonthlyHourlyInSensorZscoreOutlierProcessor,
     OutlierProcessor,
     TrimmedMeanOutlierProcessor,
     WinsorizedOutlierProcessor,
@@ -39,8 +40,8 @@ from ppom import (
     OUTLIER_PTEST_DATA_DIR,
     OUTLIER_STEST_DATA_DIR,
     OUTPUT_ROOT_DIR,
+    PREDICTION_OUTPUT_DIR,
     RAW_DATA_PATH,
-    PREDICTION_OUTPUT_DIR
 )
 from ppom.missing_processor import interpolate
 from ppom.outlier_processor import (
@@ -48,9 +49,9 @@ from ppom.outlier_processor import (
     load_outlier_removed_data,
     remove_outliers,
 )
+from ppom.prediction_test import aggregate_metrics, do_prediction_test
 from ppom.preprocessor import generate_training_test_set, simulate_data_corruption
 from ppom.simple_replacement_test import do_simple_replacement_test
-from ppom.prediction_test import do_prediction_test, aggregate_metrics
 from ppom.utils import fix_seed
 
 logging.basicConfig(
@@ -99,6 +100,7 @@ base_df = generate_base_data(
 ## 기본 베이스 기반으로 Outlier 처리된 데이터셋 생성
 logger.info("Generating outlier-processed data")
 outlier_processors: List[OutlierProcessor] = [
+    MonthlyHourlyInSensorZscoreOutlierProcessor(),
     HourlyInSensorZscoreOutlierProcessor(),
     InSensorZscoreOutlierProcessor(),
     WinsorizedOutlierProcessor(),
