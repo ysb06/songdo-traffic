@@ -1,9 +1,9 @@
+import logging
 import os
 import random
 from collections import defaultdict
 from glob import glob
 from typing import Dict, List, Tuple
-import logging
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -19,10 +19,11 @@ from lightning.pytorch.callbacks import (
 from lightning.pytorch.loggers import WandbLogger
 from metr.components import TrafficData
 from sklearn.metrics import mean_absolute_error, root_mean_squared_error
-from songdo_llm.dataset import TrafficDataModule
-from songdo_llm.model.lightning.simple_prediction import TrafficVolumePredictionModule
 from tqdm import tqdm
-from .utils import symmetric_mean_absolute_percentage_error, fix_seed
+
+from .lightning.dataset import DataInitializationError, TrafficDataModule
+from .lightning.model.rnn import TrafficVolumePredictionModule
+from .utils import fix_seed, symmetric_mean_absolute_percentage_error
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +69,20 @@ def do_prediction_test(
                 continue  # 이미 학습된 모델이 있는 경우 skip
             os.makedirs(sensor_output_dir, exist_ok=True)
 
-            data_module, model = train_model(sensor_data, test_data, sensor_output_dir)
+            if sensor_data.empty or test_data.empty:
+                logger.error(
+                    f"\r\n{'-'*30}\r\nSkipping sensor {sensor_name} in {target_name} due to empty data.\r\n{'-'*30}"
+                )
+                continue
+            try:
+                data_module, model = train_model(
+                    sensor_data, test_data, sensor_output_dir
+                )
+            except DataInitializationError as e:
+                logger.error(
+                    f"\r\n{'-'*30}\r\nSkipping sensor {sensor_name} in {target_name} due to data initialization error: {e}\r\n{'-'*30}"
+                )
+                continue
             # 예측 테스트
             test_true, test_pred = predict_by_model(data_module, sensor_output_dir)
             test_mae = mean_absolute_error(test_true, test_pred)
@@ -86,7 +100,7 @@ def do_prediction_test(
             with open(yaml_path, "w") as f:
                 yaml.safe_dump(metrics_dict, f)
                 logger.info(f"Metrics saved to {yaml_path}")
-            
+
             # 메모리 해제
             del data_module, model, test_true, test_pred
             torch.cuda.empty_cache()
