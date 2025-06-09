@@ -26,9 +26,9 @@ class NodeLinkData:
         link_cols = ["LINK_ID", "F_NODE", "T_NODE"]
         turn_cols = ["NODE_ID", "ST_LINK", "ED_LINK"]
 
-        filtered_nodes = self.__filter_data(self.node_data, node_cols, gu_code_list)
-        filtered_links = self.__filter_data(self.link_data, link_cols, gu_code_list)
-        filtered_turns = self.__filter_data(self.turn_data, turn_cols, gu_code_list)
+        filtered_nodes = self._filter_data(self.node_data, node_cols, gu_code_list)
+        filtered_links = self._filter_data(self.link_data, link_cols, gu_code_list)
+        filtered_turns = self._filter_data(self.turn_data, turn_cols, gu_code_list)
 
         return NodeLinkData(filtered_nodes, filtered_links, filtered_turns)
 
@@ -48,7 +48,7 @@ class NodeLinkData:
         turn_data.to_file(turn_path, encoding="utf-8")
         logger.info("Exporting completed.")
 
-    def __filter_data(
+    def _filter_data(
         self,
         data: Union[gpd.GeoDataFrame, pd.DataFrame],
         columns: List[str],

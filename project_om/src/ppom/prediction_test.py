@@ -40,8 +40,8 @@ learning_rate: float = 0.001
 lr_step_size: int = 100
 lr_gamma: float = 0.1
 
-k = 30  # Number of sensors to select
-fix_seed(42)  # Set random seed for reproducibility
+seed = 42  # Random seed for reproducibility
+fix_seed(seed)  # Set random seed for reproducibility
 
 
 def get_output_dir(output_dir: str, name: str, sensor_id: str) -> str:
@@ -49,13 +49,15 @@ def get_output_dir(output_dir: str, name: str, sensor_id: str) -> str:
 
 
 def do_prediction_test(
-    test_set: List[Tuple[pd.DataFrame, str]], true_df: pd.DataFrame, output_dir: str
+    test_set: List[Tuple[pd.DataFrame, str]],
+    true_df: pd.DataFrame,
+    output_dir: str,
+    k: int = 30,
 ):
+    rand = random.Random(seed)
+    target_columns = list(test_set[0][0].columns)
+    target_sensors = rand.sample(target_columns, min(k, len(target_columns) - 1))
     for target_df, target_name in test_set:
-        target_sensors = random.sample(
-            list(target_df.columns), min(k, len(target_df.columns))
-        )
-
         for sensor_name in target_sensors:
             sensor_data = pd.DataFrame({sensor_name: target_df[sensor_name]})
             test_data = pd.DataFrame({sensor_name: true_df[sensor_name]})
@@ -69,11 +71,6 @@ def do_prediction_test(
                 continue  # 이미 학습된 모델이 있는 경우 skip
             os.makedirs(sensor_output_dir, exist_ok=True)
 
-            if sensor_data.empty or test_data.empty:
-                logger.error(
-                    f"\r\n{'-'*30}\r\nSkipping sensor {sensor_name} in {target_name} due to empty data.\r\n{'-'*30}"
-                )
-                continue
             try:
                 data_module, model = train_model(
                     sensor_data, test_data, sensor_output_dir
@@ -106,7 +103,7 @@ def do_prediction_test(
             torch.cuda.empty_cache()
 
 
-def aggregate_metrics(output_dir: str):
+def aggregate_metrics(output_dir: str, only_perfect: bool = False):
     # 메트릭 유형별로 별도의 딕셔너리 초기화
     metrics_dict = {"MAE": {}, "RMSE": {}, "sMAPE": {}}
 
@@ -142,6 +139,16 @@ def aggregate_metrics(output_dir: str):
     print("MAE DataFrame 형태:", mae_df.shape)
     print("RMSE DataFrame 형태:", rmse_df.shape)
     print("sMAPE DataFrame 형태:", smape_df.shape)
+
+    # only_perfect가 True인 경우, 모든 model_name에 대해서 테스트가 된 센서만 필터링
+    if only_perfect:
+        mae_df = mae_df.dropna(axis=1, how="any")
+        rmse_df = rmse_df.dropna(axis=1, how="any")
+        smape_df = smape_df.dropna(axis=1, how="any")
+
+        print("변경된 MAE DataFrame 형태:", mae_df.shape)
+        print("변경된 RMSE DataFrame 형태:", rmse_df.shape)
+        print("변경된 sMAPE DataFrame 형태:", smape_df.shape)
 
     mae_df.to_excel(os.path.join(output_dir, "ptest_mae.xlsx"))
     rmse_df.to_excel(os.path.join(output_dir, "ptest_rmse.xlsx"))
@@ -260,3 +267,59 @@ def predict_by_model(
     test_pred = test_pred_arr.squeeze(1)
 
     return test_true, test_pred
+
+
+def aggregate_top_bottom_n_sensors(output_dir: str, target_model_name: str, n: int = 5):
+    target_path = os.path.join(output_dir, target_model_name)
+    metric_paths = glob(os.path.join(target_path, "*", "metrics_*.yaml"))
+
+    maes: list[tuple[str, float]] = []
+    rmses: list[tuple[str, float]] = []
+    smapes: list[tuple[str, float]] = []
+    for metric_path in metric_paths:
+        sensor_name = os.path.basename(os.path.dirname(metric_path))
+        with open(metric_path, "r") as f:
+            metric = yaml.safe_load(f)
+
+        maes.append((sensor_name, metric["MAE"]))
+        rmses.append((sensor_name, metric["RMSE"]))
+        smapes.append((sensor_name, metric["sMAPE"]))
+
+    maes.sort(key=lambda x: x[1])
+    rmses.sort(key=lambda x: x[1])
+    smapes.sort(key=lambda x: x[1])
+
+    top_mae = maes[:n]
+    top_rmse = rmses[:n]
+    top_smape = smapes[:n]
+    bottom_mae = maes[-n:]
+    bottom_rmse = rmses[-n:]
+    bottom_smape = smapes[-n:]
+
+    # 상위 k개 센서 DataFrame 생성
+    top_mae_df = pd.DataFrame(top_mae, columns=["Sensor", "MAE"]).set_index("Sensor")
+    top_rmse_df = pd.DataFrame(top_rmse, columns=["Sensor", "RMSE"]).set_index("Sensor")
+    top_smape_df = pd.DataFrame(top_smape, columns=["Sensor", "sMAPE"]).set_index(
+        "Sensor"
+    )
+
+    # 하위 k개 센서 DataFrame 생성
+    bottom_mae_df = pd.DataFrame(bottom_mae, columns=["Sensor", "MAE"]).set_index(
+        "Sensor"
+    )
+    bottom_rmse_df = pd.DataFrame(bottom_rmse, columns=["Sensor", "RMSE"]).set_index(
+        "Sensor"
+    )
+    bottom_smape_df = pd.DataFrame(bottom_smape, columns=["Sensor", "sMAPE"]).set_index(
+        "Sensor"
+    )
+
+    excel_path = os.path.join(output_dir, f"{target_model_name}_top_sensors.xlsx")
+    with pd.ExcelWriter(excel_path, engine="openpyxl") as writer:
+        top_mae_df.to_excel(writer, sheet_name="Top MAE")
+        top_rmse_df.to_excel(writer, sheet_name="Top RMSE")
+        top_smape_df.to_excel(writer, sheet_name="Top sMAPE")
+        bottom_mae_df.to_excel(writer, sheet_name="Bottom MAE")
+        bottom_rmse_df.to_excel(writer, sheet_name="Bottom RMSE")
+        bottom_smape_df.to_excel(writer, sheet_name="Bottom sMAPE")
+    print(f"Top and bottom {n} sensors metrics saved to {excel_path}")
