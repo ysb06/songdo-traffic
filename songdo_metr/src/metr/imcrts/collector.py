@@ -43,7 +43,7 @@ class IMCRTSCollector:
         current_date: datetime = self.start_date
 
         logger.info(
-            f"Collecting IMCRTS Data from \"{SERVICE_URL}\" between {self.start_date} and {self.end_date}"
+            f'Collecting IMCRTS Data from "{SERVICE_URL}" between {self.start_date} and {self.end_date}'
         )
         with tqdm(total=total_size) as bar:
             while current_date <= self.end_date:
@@ -130,7 +130,11 @@ class IMCRTSExcelConverter:
     """IMCRTS Collector에서 Pickle로 저장된 데이터를 Excel로 변환, openpyxl을 설치하지 못해 에러가 발생했을 때 사용"""
 
     def __init__(
-        self, output_dir: str = "./datasets/imcrts/", filename: str = "imcrts_data.pkl"
+        self,
+        output_dir: str = "./datasets/imcrts/",
+        filename: str = "imcrts_data.pkl",
+        start_date: str = "20230101",
+        end_date: str = "20231231",
     ) -> None:
         self.output_dir = output_dir
         self.filename = filename
@@ -138,6 +142,18 @@ class IMCRTSExcelConverter:
         logger.info(f"Loading Data from {self.filepath}...")
         self.data: pd.DataFrame = pd.read_pickle(self.filepath)
 
-    def export(self):
+        start_date_obj = datetime.strptime(start_date, "%Y%m%d").date()
+        end_date_obj = datetime.strptime(end_date, "%Y%m%d").date()
+
+        first_date = datetime.strptime(self.data["statDate"].min(), "%Y-%m-%d").date()
+        last_date = datetime.strptime(self.data["statDate"].max(), "%Y-%m-%d").date()
+
+        # 날짜 부분만 비교
+        if first_date != start_date_obj:
+            raise ValueError(f"{first_date} is not match to {start_date_obj}")
+        if last_date != end_date_obj:
+            raise ValueError(f"{last_date} is not match to {end_date_obj}")
+
+    def export(self, excel_file_name: str = "imcrts_data.xlsx") -> None:
         logger.info("Exporting Data to Excel...")
-        self.data.to_excel(os.path.join(self.output_dir, "imcrts_data.xlsx"))
+        self.data.to_excel(os.path.join(self.output_dir, excel_file_name))

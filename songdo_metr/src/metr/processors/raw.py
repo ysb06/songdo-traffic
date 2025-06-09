@@ -1,19 +1,18 @@
 import logging
 import os
+from typing import Optional
 
 import geopandas as gpd
 
 from metr.components import TrafficData
 from metr.dataset import generate_file_set
-from metr.imcrts.collector import IMCRTSCollector
+from metr.imcrts.collector import IMCRTSCollector, IMCRTSExcelConverter
 from metr.nodelink.converter import NodeLink
 from metr.nodelink.downloader import download_nodelink
 from metr.processors import *
 
 logger = logging.getLogger(__name__)
 
-
-PDP_KEY = os.environ.get("PDP_KEY")
 
 ROAD_DATA_PATH = os.path.join(NODELINK_TARGET_DIR, NODELINK_LINK_FILENAME)
 IMCRTS_PATH = os.path.join(IMCRTS_DIR, IMCRTS_FILENAME)
@@ -37,8 +36,85 @@ DISTANCES_PATH = os.path.join(RAW_DATASET_ROOT_DIR, DISTANCES_FILENAME)
 ADJ_MX_PATH = os.path.join(RAW_DATASET_ROOT_DIR, ADJ_MX_FILENAME)
 
 
+def generate_raw_dataset():
+    generate_nodelink_raw()
+    generate_imcrts_raw()
+    generate_metr_imc_raw()
+
+
+def generate_nodelink_raw(
+    download_target_dir: str = RAW_NODELINK_DIR_PATH,
+    nodelink_url: str = NODELINK_RAW_URL,
+    region_codes: list[str] = TARGET_REGION_CODES,
+    filename_prefix: str = "imc",
+):
+    logger.info("Downloading Node-Link Data...")
+    nodelink_raw_path = download_nodelink(download_target_dir, nodelink_url)
+    nodelink_data = NodeLink(nodelink_raw_path).filter_by_gu_codes(region_codes)
+    nodelink_data.export(download_target_dir, filename_prefix=filename_prefix)
+    logger.info("Downloading Done")
+
+
+def generate_imcrts_raw(
+    api_key: str = PDP_KEY,
+    start_date: str = IMCRTS_START_DATE,
+    end_date: str = IMCRTS_END_DATE,
+    imcrts_output_dir: str = RAW_IMCRTS_DIR_PATH,
+    imcrts_file_name: str = RAW_IMCRTS_FILENAME,
+    metr_imc_excel_file_name: Optional[str] = RAW_IMCRTS_EXCEL_FILENAME,
+):
+    logger.info("Collecting IMCRTS Data...")
+    imcrts_file_path = os.path.join(imcrts_output_dir, imcrts_file_name)
+    if os.path.exists(imcrts_file_path):
+        converter = IMCRTSExcelConverter(
+            output_dir=imcrts_output_dir,
+            filename=imcrts_file_name,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        logger.info("IMCRTS data already exists")
+        if metr_imc_excel_file_name:
+            logger.info("Converting IMCRTS data to Excel...")
+            converter.export(excel_file_name=metr_imc_excel_file_name)
+        return
+
+    collector = IMCRTSCollector(
+        api_key=api_key,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    collector.collect(ignore_empty=True)
+
+    collector.to_pickle(output_dir=imcrts_output_dir, file_name=imcrts_file_name)
+    if metr_imc_excel_file_name:
+        logger.info("Converting IMCRTS data to Excel...")
+        collector.to_excel(
+            output_dir=imcrts_output_dir, file_name=metr_imc_excel_file_name
+        )
+
+    logger.info("Collecting Done")
+
+
+def generate_metr_imc_raw(
+    road_data_path: str = RAW_NODELINK_LINK_PATH,
+    traffic_data_path: str = RAW_IMCRTS_PATH,
+    metr_imc_path: str = RAW_METR_IMC_PATH,
+    metr_imc_excel_path: Optional[str] = RAW_METR_IMC_EXCEL_PATH,
+):
+    road_data: gpd.GeoDataFrame = gpd.read_file(road_data_path)
+    traffic_data = TrafficData.import_from_pickle(traffic_data_path)
+
+    logger.info("Matching Link IDs...")
+    traffic_data.sensor_filter = road_data["LINK_ID"].tolist()
+    traffic_data.to_hdf(metr_imc_path)
+    if metr_imc_excel_path:
+        traffic_data.to_excel(metr_imc_excel_path)
+    logger.info("Matching Done")
+
+
 # Todo: 주석 해제
 # Todo: 상수에 의존하지 않게 변경
+
 
 def run_process():
     os.makedirs(RAW_MISCELLANEOUS_DIR, exist_ok=True)
@@ -54,7 +130,7 @@ def download_nodelink_raw():
     logger.info("Downloading Node-Link Data...")
     nodelink_raw_path = download_nodelink(NODELINK_TARGET_DIR, NODELINK_RAW_URL)
     nodelink_data = NodeLink(nodelink_raw_path).filter_by_gu_codes(INCHEON_REGION_CODES)
-    nodelink_data.export(NODELINK_TARGET_DIR)
+    nodelink_data.export(NODELINK_TARGET_DIR, filename_prefix="imc")
     logger.info("Downloading Done")
 
 

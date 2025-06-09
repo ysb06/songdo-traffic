@@ -1,7 +1,7 @@
 import logging
 import os
 from functools import reduce
-from typing import List, Union
+from typing import List, Optional, Union
 
 import geopandas as gpd
 import pandas as pd
@@ -32,10 +32,15 @@ class NodeLinkData:
 
         return NodeLinkData(filtered_nodes, filtered_links, filtered_turns)
 
-    def export(self, output_dir: str, filename_prefix: str = "imc") -> None:
-        node_path = os.path.join(output_dir, f"{filename_prefix}_node.shp")
-        link_path = os.path.join(output_dir, f"{filename_prefix}_link.shp")
-        turn_path = os.path.join(output_dir, f"{filename_prefix}_turninfo.dbf")
+    def export(self, output_dir: str, filename_prefix: Optional[str] = None) -> None:
+        node_filename = f"{filename_prefix}_node.shp" if filename_prefix else "node.shp"
+        link_filename = f"{filename_prefix}_link.shp" if filename_prefix else "link.shp"
+        turn_filename = (
+            f"{filename_prefix}_turninfo.dbf" if filename_prefix else "turninfo.dbf"
+        )
+        node_path = os.path.join(output_dir, node_filename)
+        link_path = os.path.join(output_dir, link_filename)
+        turn_path = os.path.join(output_dir, turn_filename)
 
         turn_data = gpd.GeoDataFrame(self.turn_data)
 
@@ -66,11 +71,8 @@ class NodeLink(NodeLinkData):
 
         logger.info("Loading data...")
         node_data: gpd.GeoDataFrame = gpd.read_file(self.node_path, encoding=encoding)
-        logger.info(f"Loaded: {type(node_data)}")
         link_data: gpd.GeoDataFrame = gpd.read_file(self.link_path, encoding=encoding)
-        logger.info(f"Loaded: {type(link_data)}")
         turn_data: pd.DataFrame = gpd.read_file(self.turn_path, encoding=encoding)
-        logger.info(f"Loaded: {type(turn_data)}")
 
         super().__init__(node_data, link_data, turn_data)
 
