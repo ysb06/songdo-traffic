@@ -43,7 +43,7 @@ from ppom.outlier_processor import (
 from ppom.prediction_test import (
     aggregate_metrics,
     aggregate_top_bottom_n_sensors,
-    do_prediction_test,
+    run_prediction_test,
 )
 from ppom.preprocessor import generate_training_test_set, simulate_data_corruption
 from ppom.simple_replacement_test import do_simple_replacement_test
@@ -80,6 +80,13 @@ training_df, test_true_df = generate_training_test_set(
 )
 logger.info(f"Training data shape: {training_df.shape}")
 logger.info(f"Test data shape: {test_true_df.shape}")
+
+logger.info("Generating Corrupted Test Data...")
+srep_test_df = simulate_data_corruption(
+    test_true_df,
+    training_df,
+    random_seed=RANDOM_SEED,
+)
 
 
 # -------------- 처리 시작 -------------- #
@@ -118,23 +125,14 @@ def do_data_processing() -> None:
         outlier_processors,
         output_dir=OUTLIER_PTEST_DATA_DIR,
     )
-    logger.info("Outlier-processed data generated")
-
-    # Generate data for simple replacement test (srep)
-    logger.info("Generating data for simple replacement test")
-    srep_test_df = simulate_data_corruption(
-        test_true_df,
-        training_df,
-        random_seed=RANDOM_SEED,
-    )
+    logger.info("Outlier-processed data generated")    
 
     # outlier_processed_data와 같은 데이터(이어야 함)
     ptest_outlier_rm_data = load_outlier_removed_data(OUTLIER_PTEST_DATA_DIR)
     for srep_raw, name in ptest_outlier_rm_data:
-        srep_data = pd.concat([srep_raw, srep_test_df], axis=0, copy=True)
+        srep_data = pd.concat([srep_raw, srep_test_df.copy()], axis=0, copy=True)
         filepath = os.path.join(OUTLIER_STEST_DATA_DIR, f"{name}.h5")
         srep_data.to_hdf(filepath, key="data")
-    logger.info(f"Simple replacement test data shape: {srep_test_df.shape}")
     stest_outlier_rm_data = load_outlier_removed_data(OUTLIER_STEST_DATA_DIR)
 
     interpolators: List[Interpolator] = [
@@ -176,7 +174,10 @@ def generate_stest_results() -> None:
     logger.info(
         f"Calculating metrics for simple replacement test with {len(stest_data)} datasets..."
     )
-    total, mae, rmse, smape = do_simple_replacement_test(stest_data, test_true_df)
+    diff_mask = (srep_test_df != test_true_df) | (
+        srep_test_df.isna() & ~test_true_df.isna()
+    )
+    total, mae, rmse, smape = do_simple_replacement_test(stest_data, test_true_df, diff_mask)
     # Save results
     logger.info("Saving results for simple replacement test...")
     total.to_excel(os.path.join(OUTPUT_ROOT_DIR, "stest_total_results.xlsx"))
@@ -195,7 +196,7 @@ def do_prediction_test() -> None:
         )
         for filepath in ptest_data_list
     ]
-    do_prediction_test(ptest_data, test_true_df, PREDICTION_OUTPUT_DIR)
+    run_prediction_test(ptest_data, test_true_df, PREDICTION_OUTPUT_DIR)
     aggregate_metrics(PREDICTION_OUTPUT_DIR, only_perfect=False)
 
     hzscore_time_mean_data = [
@@ -205,7 +206,7 @@ def do_prediction_test() -> None:
     print(
         f"Running prediction test for hzscore-time_mean with all {total_sensors} sensors"
     )
-    do_prediction_test(
+    run_prediction_test(
         hzscore_time_mean_data, test_true_df, PREDICTION_OUTPUT_DIR, k=total_sensors
     )
     aggregate_top_bottom_n_sensors(

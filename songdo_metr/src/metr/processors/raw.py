@@ -38,8 +38,23 @@ ADJ_MX_PATH = os.path.join(RAW_DATASET_ROOT_DIR, ADJ_MX_FILENAME)
 
 def generate_raw_dataset():
     generate_nodelink_raw()
-    generate_imcrts_raw()
-    generate_metr_imc_raw()
+    generate_imcrts_raw(metr_imc_excel_file_name=None)
+    generate_metr_imc_raw(metr_imc_excel_path=None)
+    generate_metr_imc_shapefile()
+
+    traffic_data = TrafficData.import_from_hdf(RAW_METR_IMC_PATH)
+
+    metadata, sensor_locations, distances, adj_mx = generate_file_set(
+        traffic_data,
+        NODELINK_TARGET_DIR,
+        NODELINK_LINK_FILENAME,
+        NODELINK_TURN_FILENAME,
+        RAW_METADATA_PATH,
+        RAW_SENSOR_LOCATIONS_PATH,
+        RAW_DISTANCES_PATH,
+        RAW_ADJ_MX_FILENAME,
+    )
+    distances.to_shapefile(sensor_locations.data, filepath=RAW_DISTANCES_SHAPEFILE_PATH)
 
 
 def generate_nodelink_raw(
@@ -64,20 +79,6 @@ def generate_imcrts_raw(
     metr_imc_excel_file_name: Optional[str] = RAW_IMCRTS_EXCEL_FILENAME,
 ):
     logger.info("Collecting IMCRTS Data...")
-    imcrts_file_path = os.path.join(imcrts_output_dir, imcrts_file_name)
-    if os.path.exists(imcrts_file_path):
-        converter = IMCRTSExcelConverter(
-            output_dir=imcrts_output_dir,
-            filename=imcrts_file_name,
-            start_date=start_date,
-            end_date=end_date,
-        )
-        logger.info("IMCRTS data already exists")
-        if metr_imc_excel_file_name:
-            logger.info("Converting IMCRTS data to Excel...")
-            converter.export(excel_file_name=metr_imc_excel_file_name)
-        return
-
     collector = IMCRTSCollector(
         api_key=api_key,
         start_date=start_date,
@@ -112,8 +113,19 @@ def generate_metr_imc_raw(
     logger.info("Matching Done")
 
 
-# Todo: 주석 해제
-# Todo: 상수에 의존하지 않게 변경
+def generate_metr_imc_shapefile(
+    metr_imc_path: str = RAW_METR_IMC_PATH,
+    node_link_path: str = RAW_NODELINK_LINK_PATH,
+    output_path: str = RAW_METR_IMC_SHAPEFILE_PATH,
+):
+    """
+    Generates a shapefile from the METR IMC traffic data.
+    """
+    traffic_data = TrafficData.import_from_hdf(metr_imc_path)
+    road_data: gpd.GeoDataFrame = gpd.read_file(node_link_path)
+    traffic_link_ids = set(traffic_data.data.columns)
+    filtered_roads = road_data[road_data["LINK_ID"].isin(traffic_link_ids)].copy()
+    filtered_roads.to_file(output_path)
 
 
 def run_process():

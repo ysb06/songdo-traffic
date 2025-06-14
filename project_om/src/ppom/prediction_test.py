@@ -48,7 +48,7 @@ def get_output_dir(output_dir: str, name: str, sensor_id: str) -> str:
     return os.path.join(output_dir, name, sensor_id)
 
 
-def do_prediction_test(
+def run_prediction_test(
     test_set: List[Tuple[pd.DataFrame, str]],
     true_df: pd.DataFrame,
     output_dir: str,

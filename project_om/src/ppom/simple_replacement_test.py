@@ -8,7 +8,9 @@ from .utils import symmetric_mean_absolute_percentage_error
 
 
 def do_simple_replacement_test(
-    test_set: List[Tuple[pd.DataFrame, str]], true_df: pd.DataFrame
+    test_set: List[Tuple[pd.DataFrame, str]],
+    true_df: pd.DataFrame,
+    diff_mask: pd.DataFrame,
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     total_results = {}
     mae_sensor_results = defaultdict(list)
@@ -17,7 +19,10 @@ def do_simple_replacement_test(
     sensor_results_index: List[str] = []
     for target_df, target_name in test_set:
         test_target_df = target_df.loc[true_df.index]
-        result = calculate_metrics(y_true=true_df, y_pred=test_target_df)
+        target_mask = diff_mask.loc[true_df.index]
+        result = calculate_metrics(
+            y_true=true_df, y_pred=test_target_df, target_mask=target_mask
+        )
         total_metrics: Dict[str, Union[int, float]] = result["total"]
         each_sensor_metrics: Dict[str, Dict[str, Union[int, float]]] = result["sensor"]
         total_results[target_name] = {
@@ -51,7 +56,10 @@ def do_simple_replacement_test(
 
 
 def calculate_metrics(
-    y_true: pd.DataFrame, y_pred: pd.DataFrame, skip_na: bool = True
+    y_true: pd.DataFrame,
+    y_pred: pd.DataFrame,
+    target_mask: pd.Series,
+    skip_na: bool = True,
 ) -> Dict[str, Union[float, Dict[str, Dict[str, float]]]]:
     """
     두 데이터프레임 간의 MAE와 RMSE를 계산

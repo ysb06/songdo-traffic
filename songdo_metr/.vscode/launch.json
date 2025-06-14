@@ -8,6 +8,15 @@
 			"module": "metr",
 			"console": "integratedTerminal",
 			"justMyCode": false
+		},
+		{
+			"name": "Run Tests",
+			"type": "debugpy",
+			"request": "launch",
+			"module": "pytest",
+			"console": "integratedTerminal",
+			"args": ["tests", "-s"],
+			"justMyCode": false
 		}
 	]
 }

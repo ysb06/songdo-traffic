@@ -24,6 +24,8 @@ def generate_file_set(
     distances.to_csv(distances_path)
     adj_mx.to_pickle(adj_mx_path)
 
+    return metadata, sensor_locations, distances, adj_mx
+
 
 def generate_dataset(
     traffic_data: TrafficData,

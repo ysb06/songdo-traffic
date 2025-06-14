@@ -5,6 +5,7 @@ from typing import List, Optional, Set, Union
 
 import numpy as np
 import pandas as pd
+from pandas import DateOffset
 from tqdm import tqdm
 
 from .interpolation import Interpolator
@@ -25,6 +26,7 @@ class TrafficData:
         # 날짜별로 묶음
         traffic_date_group = raw.groupby("statDate")
         # 날짜별로 로드
+        logger.info(f"Loading data from pickle file ({filepath})...")
         with tqdm(total=len(traffic_date_group)) as pbar:
             for date, group in traffic_date_group:
                 # 시간별로 로드
@@ -67,13 +69,17 @@ class TrafficData:
         self,
         raw: pd.DataFrame,
         dtype: Optional[Union[str, type]] = None,
+        freq: Optional[Union[str, DateOffset]] = DateOffset(hours=1),
         path: Optional[str] = None,
     ) -> None:
         self._raw = raw
         self._raw.sort_index(inplace=True)
         if dtype is not None:
             self._raw = self._as_type(self._raw, dtype)
-        self._raw = self._raw.asfreq(pd.infer_freq(self._raw.index))
+        if freq is None:
+            freq = pd.infer_freq(self._raw.index)
+            logger.info(f"Inferred frequency: {freq}")
+        self._raw = self._raw.asfreq(freq)
         self._verify_data()
         self.reset_data()
 

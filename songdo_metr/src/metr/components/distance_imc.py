@@ -7,6 +7,7 @@ import networkx as nx
 import pandas as pd
 from shapely.geometry import LineString
 from tqdm import tqdm
+from shapely.geometry import LineString
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +66,52 @@ class DistancesImc:
         self.data.to_csv(filepath, index=False)
         logger.info("Saving Complete")
 
+    def to_shapefile(
+        self,
+        sensor_locations: pd.DataFrame,
+        filepath: str,
+        crs: str = "EPSG:3857",
+    ) -> None:
+        logger.info(f"{filepath}에 Shapefile 생성 중...")
+
+        # 센서 위치 정보를 빠른 조회를 위해 딕셔너리로 변환
+        loc_dict = sensor_locations.set_index("sensor_id")[
+            ["latitude", "longitude"]
+        ].to_dict("index")
+
+        # 각 from-to 쌍에 대한 LineString 생성
+        geometries = []
+        properties = []
+
+        for _, row in tqdm(self.data.iterrows(), total=self.data.shape[0]):
+            from_id = row["from"]
+            to_id = row["to"]
+
+            # 두 ID가 모두 위치 정보에 있는지 확인
+            if from_id not in loc_dict or to_id not in loc_dict:
+                logger.warning(
+                    f"{from_id} 또는 {to_id}의 위치 정보가 없습니다. 건너뜁니다..."
+                )
+                continue
+
+            # LineString 생성
+            from_point = (loc_dict[from_id]["longitude"], loc_dict[from_id]["latitude"])
+            to_point = (loc_dict[to_id]["longitude"], loc_dict[to_id]["latitude"])
+            line = LineString([from_point, to_point])
+
+            # 목록에 추가
+            geometries.append(line)
+            properties.append({"from_id": from_id, "to_id": to_id})
+
+        # GeoDataFrame 생성
+        gdf = gpd.GeoDataFrame(properties, geometry=geometries, crs="EPSG:4326")
+        gdf.to_crs(crs, inplace=True)
+        
+        # Shapefile로 저장
+        gdf.to_file(filepath)
+        
+        logger.info("Shapefile 생성 완료")
+
 
 class SensorGraph:
     def __init__(
@@ -73,17 +120,17 @@ class SensorGraph:
         turn_info: pd.DataFrame,  # 회전 제한 정보
     ) -> None:
         logger.info("Generating Sensor Graph...")
-        self._G = self.__generate_graph(road_data)
+        self._G = self._generate_graph(road_data)
         logger.info(f"Nodes: {len(self._G.nodes)}, Edges: {len(self._G.edges)}")
         logger.info("Applying Turn Restrictions...")
-        self._G = self.__apply_turn_restrictions(self._G, turn_info)
+        self._G = self._apply_turn_restrictions(self._G, turn_info)
         logger.info(f"Nodes: {len(self._G.nodes)}, Edges: {len(self._G.edges)}")
 
     @property
     def graph(self) -> nx.DiGraph:
         return self._G
 
-    def __apply_turn_restrictions(
+    def _apply_turn_restrictions(
         self, G: nx.DiGraph, turn_info: pd.DataFrame
     ) -> nx.DiGraph:
         for _, row in tqdm(
@@ -120,7 +167,7 @@ class SensorGraph:
 
         return G
 
-    def __generate_graph(self, road_data: gpd.GeoDataFrame):
+    def _generate_graph(self, road_data: gpd.GeoDataFrame):
         G = nx.DiGraph()
 
         # Node 추가
