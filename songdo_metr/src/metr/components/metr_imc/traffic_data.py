@@ -69,7 +69,7 @@ class TrafficData:
         self,
         raw: pd.DataFrame,
         dtype: Optional[Union[str, type]] = None,
-        freq: Optional[Union[str, DateOffset]] = DateOffset(hours=1),
+        freq: Optional[str] = "h",
         path: Optional[str] = None,
     ) -> None:
         self._raw = raw

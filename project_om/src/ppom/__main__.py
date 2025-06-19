@@ -22,6 +22,7 @@ from metr.components.metr_imc.outlier import (
     OutlierProcessor,
     TrimmedMeanOutlierProcessor,
     WinsorizedOutlierProcessor,
+    HMHZscoreProcessor,
 )
 
 from ppom import (
@@ -105,14 +106,14 @@ def do_data_processing() -> None:
     logger.info("Generating outlier-processed data")
     outlier_processors: List[OutlierProcessor] = [
         MonthlyHourlyInSensorZscoreOutlierProcessor(),
-        HourlyInSensorZscoreOutlierProcessor(),
+        HMHZscoreProcessor(),
         InSensorZscoreOutlierProcessor(),
         WinsorizedOutlierProcessor(),
         TrimmedMeanOutlierProcessor(),
         MADOutlierProcessor(),
     ]
     outlier_processors[0].name = "mhzscore"
-    outlier_processors[1].name = "hzscore"
+    outlier_processors[1].name = "holizscore"
     outlier_processors[2].name = "zscore"
     outlier_processors[3].name = "winsor"
     outlier_processors[4].name = "trimm"
@@ -199,19 +200,21 @@ def do_prediction_test() -> None:
     run_prediction_test(ptest_data, test_true_df, PREDICTION_OUTPUT_DIR)
     aggregate_metrics(PREDICTION_OUTPUT_DIR, only_perfect=False)
 
-    hzscore_time_mean_data = [
-        item for item in ptest_data if item[1] == "hzscore-time_mean"
-    ]
-    total_sensors = len(hzscore_time_mean_data[0][0].columns)
-    print(
-        f"Running prediction test for hzscore-time_mean with all {total_sensors} sensors"
-    )
-    run_prediction_test(
-        hzscore_time_mean_data, test_true_df, PREDICTION_OUTPUT_DIR, k=total_sensors
-    )
-    aggregate_top_bottom_n_sensors(
-        PREDICTION_OUTPUT_DIR, target_model_name="hzscore-time_mean", n=5
-    )
+    # Time Mean이 가장 좋은 성능을 보인다고 할 때, 수행
+    # 현재는 다른 모델을 선정 
+    # hzscore_time_mean_data = [
+    #     item for item in ptest_data if item[1] == "hzscore-time_mean"
+    # ]
+    # total_sensors = len(hzscore_time_mean_data[0][0].columns)
+    # print(
+    #     f"Running prediction test for hzscore-time_mean with all {total_sensors} sensors"
+    # )
+    # run_prediction_test(
+    #     hzscore_time_mean_data, test_true_df, PREDICTION_OUTPUT_DIR, k=total_sensors
+    # )
+    # aggregate_top_bottom_n_sensors(
+    #     PREDICTION_OUTPUT_DIR, target_model_name="hzscore-time_mean", n=5
+    # )
 
 
 def plot_sensor_timeseries(df: pd.DataFrame, target_sensor: str) -> None:

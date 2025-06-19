@@ -37,8 +37,8 @@ ADJ_MX_PATH = os.path.join(RAW_DATASET_ROOT_DIR, ADJ_MX_FILENAME)
 
 
 def generate_raw_dataset():
-    generate_nodelink_raw()
-    generate_imcrts_raw(metr_imc_excel_file_name=None)
+    # generate_nodelink_raw()
+    # generate_imcrts_raw(metr_imc_excel_file_name=None)
     generate_metr_imc_raw(metr_imc_excel_path=None)
     generate_metr_imc_shapefile()
 

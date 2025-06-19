@@ -1,4 +1,5 @@
 import pandas as pd
+import holidays
 
 import logging
 
@@ -8,7 +9,7 @@ logger = logging.getLogger(__name__)
 class Interpolator:
     def __init__(self) -> None:
         self.name = self.__class__.__name__
-        
+
     def _interpolate(self, df: pd.DataFrame) -> pd.DataFrame:
         raise NotImplementedError
 
@@ -45,32 +46,61 @@ class TimeMeanFillInterpolator(Interpolator):
         return result
 
 
+class HMHMeanFillInterpolator(Interpolator):
+    def __init__(self) -> None:
+        super().__init__()
+
+    def _is_holiday(self, date: pd.Timestamp) -> bool:
+        korean_holidays = holidays.KR(years=date.year)
+        return date.weekday() >= 5 or date in korean_holidays
+
+    def _interpolate(self, df: pd.DataFrame) -> pd.DataFrame:
+        df_filled = df.copy()
+
+        is_holiday = pd.Series(
+            df_filled.index.map(self._is_holiday), index=df_filled.index
+        )
+
+        grouping_keys = [df_filled.index.month, df_filled.index.hour, is_holiday]
+        group_means = df_filled.groupby(grouping_keys).transform("mean")
+
+        df_filled.fillna(group_means, inplace=True)
+
+        if df_filled.isnull().values.any():
+            hourly_means = df_filled.groupby(df_filled.index.hour).transform("mean")
+            df_filled.fillna(hourly_means, inplace=True)
+
+        return df_filled
+
+
 class ShiftFillInterpolator(Interpolator):
     def __init__(self, periods: int = 168) -> None:
         self.periods = periods
-    
+
     def _fill_na_with_shifted(self, s: pd.Series) -> pd.Series:
         """결측치를 과거 데이터로 채우는 최적화된 함수"""
         # 결측치가 없으면 빠르게 반환
         if not s.isna().any():
             return s
-        
+
         s_filled = s.copy()
         na_indices = s[s.isna()].index
         values_dict = s.to_dict()
         min_idx = s.index.min()
-        
+
         # 각 결측치에 대해 처리
         for na_idx in na_indices:
             shifted_time_idx = na_idx - pd.Timedelta(hours=self.periods)
             while shifted_time_idx >= min_idx:
                 # 해당 시점에 값이 있고 NaN이 아니면 사용
-                if shifted_time_idx in values_dict and not pd.isna(values_dict[shifted_time_idx]):
+                if shifted_time_idx in values_dict and not pd.isna(
+                    values_dict[shifted_time_idx]
+                ):
                     s_filled.loc[na_idx] = values_dict[shifted_time_idx]
                     break
                 # 아닌 경우 다음 기간으로 이동
                 shifted_time_idx -= pd.Timedelta(hours=self.periods)
-        
+
         return s_filled
 
     def _interpolate(self, df: pd.DataFrame) -> pd.DataFrame:

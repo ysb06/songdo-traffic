@@ -43,6 +43,8 @@ lr_gamma: float = 0.1
 seed = 42  # Random seed for reproducibility
 fix_seed(seed)  # Set random seed for reproducibility
 
+K = 40  # Number of sensors to randomly select for prediction test
+
 
 def get_output_dir(output_dir: str, name: str, sensor_id: str) -> str:
     return os.path.join(output_dir, name, sensor_id)
@@ -52,7 +54,7 @@ def run_prediction_test(
     test_set: List[Tuple[pd.DataFrame, str]],
     true_df: pd.DataFrame,
     output_dir: str,
-    k: int = 30,
+    k: int = K,
 ):
     rand = random.Random(seed)
     target_columns = list(test_set[0][0].columns)
