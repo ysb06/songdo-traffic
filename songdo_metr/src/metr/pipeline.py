@@ -1,0 +1,167 @@
+import logging
+import os
+
+import geopandas as gpd
+
+from metr.components import (
+    AdjacencyMatrix,
+    DistancesImc,
+    IdList,
+    Metadata,
+    SensorLocations,
+    TrafficData,
+)
+from metr.imcrts.collector import IMCRTSCollector
+from metr.nodelink.converter import NodeLink
+from metr.nodelink.downloader import download_nodelink
+from metr.utils import PathConfig
+
+
+logger = logging.getLogger(__name__)
+path_conf = PathConfig.from_yaml("config.yaml")
+
+
+# Other Settings
+PDP_KEY = os.environ.get("PDP_KEY")
+NODELINK_RAW_URL = (
+    "https://www.its.go.kr/opendata/nodelinkFileSDownload/DF_195/0"  # 2024-03-25
+)
+TARGET_REGION_CODES = [
+    "161",
+    "162",
+    "163",
+    "164",
+    "165",
+    "166",
+    "167",
+    "168",
+    "169",
+]  # All Incheon Regions
+IMCRTS_START_DATE = "20221101"
+IMCRTS_END_DATE = "20250310"
+
+
+def generate_raw_dataset():
+    # Generating Core Files
+    generate_nodelink_raw()
+    generate_imcrts_raw()
+    generate_metr_imc_raw()
+    generate_dataset()
+
+    # Generating Misc
+    generate_metr_imc_shapefile()
+    generate_distances_shapefile()
+
+
+def generate_distances_shapefile(
+    distances_path: str = path_conf.distances_path,
+    sensor_locations_path: str = path_conf.sensor_locations_path,
+    output_path: str = path_conf.distances_shapefile_path,
+):
+    distances = DistancesImc.import_from_csv(distances_path)
+    sensor_locations = SensorLocations.import_from_csv(sensor_locations_path)
+    distances.to_shapefile(sensor_locations.data, filepath=output_path)
+
+
+def generate_dataset(
+    traffic_data_path: str = path_conf.metr_imc_path,
+    nodelink_link_path: str = path_conf.nodelink_link_path,
+    nodelink_turn_path: str = path_conf.nodelink_turn_path,
+    ids_output_path: str = path_conf.sensor_ids_path,
+    metadata_output_path: str = path_conf.metadata_path,
+    sensor_locations_output_path: str = path_conf.sensor_locations_path,
+    distances_output_path: str = path_conf.distances_path,
+    adj_mx_output_path: str = path_conf.adj_mx_path,
+):
+    traffic_data = TrafficData.import_from_hdf(traffic_data_path)
+
+    # Sensor IDs
+    metr_ids = IdList(traffic_data.data.columns.to_list())
+    metr_ids.to_txt(ids_output_path)
+
+    # Metadata
+    metadata = Metadata.import_from_nodelink(nodelink_link_path)
+    metadata.sensor_filter = metr_ids.data  # 수정 필요
+    metadata.to_hdf(metadata_output_path)
+
+    # Sensor Locations
+    sensor_locations = SensorLocations.import_from_nodelink(nodelink_link_path)
+    sensor_locations.sensor_filter = metr_ids.data
+    sensor_locations.to_csv(sensor_locations_output_path)
+
+    # Distances
+    distances = DistancesImc.import_from_nodelink(
+        nodelink_link_path,
+        nodelink_turn_path,
+        target_ids=metr_ids.data,
+        distance_limit=9000,
+    )
+    distances.to_csv(distances_output_path)
+
+    # Adjacency Matrix
+    adj_mx: AdjacencyMatrix = AdjacencyMatrix.import_from_components(
+        metr_ids, distances
+    )
+    adj_mx.to_pickle(adj_mx_output_path)
+
+
+def generate_nodelink_raw(
+    nodelink_url: str = NODELINK_RAW_URL,
+    region_codes: list[str] = TARGET_REGION_CODES,
+    download_target_dir: str = path_conf.nodelink_dir_path,
+    node_output_path: str = path_conf.nodelink_node_path,
+    link_output_path: str = path_conf.nodelink_link_path,
+    turn_output_path: str = path_conf.nodelink_turn_path,
+):
+    logger.info("Downloading Node-Link Data...")
+    nodelink_raw_path = download_nodelink(download_target_dir, nodelink_url)
+    nodelink_data = NodeLink(nodelink_raw_path).filter_by_gu_codes(region_codes)
+    nodelink_data.export(
+        node_output_path=node_output_path,
+        link_output_path=link_output_path,
+        turn_output_path=turn_output_path,
+    )
+    logger.info("Downloading Done")
+
+
+def generate_imcrts_raw(
+    api_key: str = PDP_KEY,
+    start_date: str = IMCRTS_START_DATE,
+    end_date: str = IMCRTS_END_DATE,
+    imcrts_output_path: str = path_conf.imcrts_path,
+):
+    logger.info("Collecting IMCRTS Data...")
+    collector = IMCRTSCollector(
+        api_key=api_key,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    collector.collect(ignore_empty=True)
+    collector.to_pickle(imcrts_output_path)
+    logger.info("Collecting Done")
+
+
+def generate_metr_imc_raw(
+    road_data_path: str = path_conf.nodelink_link_path,
+    traffic_data_path: str = path_conf.imcrts_path,
+    metr_imc_path: str = path_conf.metr_imc_path,
+):
+    road_data: gpd.GeoDataFrame = gpd.read_file(road_data_path)
+    traffic_data = TrafficData.import_from_pickle(traffic_data_path)
+
+    logger.info("Matching Link IDs...")
+    traffic_data.select_sensors(road_data["LINK_ID"].tolist())
+    traffic_data.to_hdf(metr_imc_path)
+    logger.info("Matching Done")
+
+
+def generate_metr_imc_shapefile(
+    metr_imc_path: str = path_conf.metr_imc_path,
+    node_link_path: str = path_conf.nodelink_link_path,
+    output_path: str = path_conf.metr_shapefile_path,
+):
+    traffic_data = TrafficData.import_from_hdf(metr_imc_path)
+    road_data: gpd.GeoDataFrame = gpd.read_file(node_link_path)
+    traffic_link_ids = set(traffic_data.data.columns)
+    filtered_roads = road_data[road_data["LINK_ID"].isin(traffic_link_ids)].copy()
+    filtered_roads.to_file(output_path)

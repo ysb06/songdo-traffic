@@ -1,26 +1,32 @@
 import os
-from metr.processors.raw import (
-    RAW_MISCELLANEOUS_DIR_PATH,
-    RAW_NODELINK_DIR_PATH,
-    RAW_IMCRTS_DIR_PATH,
-    RAW_NODELINK_LINK_PATH,
-    RAW_NODELINK_TURN_PATH,
-    RAW_IMCRTS_PATH,
-    RAW_METR_IMC_PATH,
-)
-from metr.components import TrafficData
 from datetime import datetime
+
 import pandas as pd
 
+from metr.components import TrafficData
+from metr.pipeline import (
+    RAW_ADJ_MX_PATH,
+    RAW_DISTANCES_PATH,
+    RAW_IMCRTS_PATH,
+    RAW_METADATA_PATH,
+    RAW_METR_IMC_PATH,
+    RAW_NODELINK_LINK_PATH,
+    RAW_NODELINK_TURN_PATH,
+    RAW_SENSOR_IDS_PATH,
+    RAW_SENSOR_LOCATIONS_PATH,
+)
 
-def test_file_existance():
-    assert os.path.exists(RAW_MISCELLANEOUS_DIR_PATH)
-    assert os.path.exists(RAW_NODELINK_DIR_PATH)
-    assert os.path.exists(RAW_IMCRTS_DIR_PATH)
+
+def test_core_file_existance():
     assert os.path.exists(RAW_NODELINK_LINK_PATH)
     assert os.path.exists(RAW_NODELINK_TURN_PATH)
     assert os.path.exists(RAW_IMCRTS_PATH)
     assert os.path.exists(RAW_METR_IMC_PATH)
+    assert os.path.exists(RAW_METADATA_PATH)
+    assert os.path.exists(RAW_SENSOR_IDS_PATH)
+    assert os.path.exists(RAW_SENSOR_LOCATIONS_PATH)
+    assert os.path.exists(RAW_DISTANCES_PATH)
+    assert os.path.exists(RAW_ADJ_MX_PATH)
 
 
 def test_check_raw_info():

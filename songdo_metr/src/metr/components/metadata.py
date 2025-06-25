@@ -15,11 +15,8 @@ logger = logging.getLogger(__name__)
 
 class Metadata:
     @staticmethod
-    def import_from_nodelink(
-        nodelink_dir: str,
-        road_filename: str = "imc_link.shp",
-    ) -> "Metadata":
-        road_data = gpd.read_file(os.path.join(nodelink_dir, road_filename))
+    def import_from_nodelink(nodelink_path: str) -> "Metadata":
+        road_data = gpd.read_file(nodelink_path)
         road_data = road_data[
             [
                 "LINK_ID",  # 링크ID (Link ID)

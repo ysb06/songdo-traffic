@@ -16,9 +16,9 @@ class SensorLocations:
         lat_col: str = "latitude",
         lon_col: str = "longitude",
     ) -> "SensorLocations":
-        with open(filepath, 'r') as file:
-            first_line = file.readline().strip().split(',')
-        
+        with open(filepath, "r") as file:
+            first_line = file.readline().strip().split(",")
+
         def is_first_line_float(line):
             try:
                 for item in line:
@@ -26,7 +26,7 @@ class SensorLocations:
                 return True
             except ValueError:
                 return False
-            
+
         if is_first_line_float(first_line):
             raw = pd.read_csv(filepath, header=None)
             raw.columns = [id_col, lat_col, lon_col]  # 기본 열 이름 설정
@@ -40,19 +40,7 @@ class SensorLocations:
         return SensorLocations(raw)
 
     @staticmethod
-    def import_from_nodelink(
-        nodelink_dir: str,
-        road_filename: str = "imc_link.shp",
-    ) -> "SensorLocations":
-        """도로 데이터로부터 센서 위치 데이터를 가져옵니다. 단, 센서 위치는 정확히 알 수 없으므로 도로의 중간 지점을 센서 위치로 가정합니다.
-
-        Args:
-            nodelink_dir (str): 노드링크데이터가 있는 폴더
-            road_filename (str): 도로(LINK) 정보가 있는 파일 이름
-
-        Returns:
-            SensorLocations: 노드링크 데이터로부터 추출한 센서 위치 데이터
-        """
+    def import_from_nodelink(nodelink_road_path) -> "SensorLocations":
         def calculate_mean_coords(geometry):
             x_coords = [point[0] for point in geometry.coords]
             y_coords = [point[1] for point in geometry.coords]
@@ -61,9 +49,7 @@ class SensorLocations:
 
             return pd.Series([mean_x, mean_y], index=["longitude", "latitude"])
 
-        road_data: gpd.GeoDataFrame = gpd.read_file(
-            os.path.join(nodelink_dir, road_filename)
-        )
+        road_data: gpd.GeoDataFrame = gpd.read_file(nodelink_road_path)
         road_data = road_data.to_crs(epsg=4326)
         result = pd.DataFrame(columns=["sensor_id", "latitude", "longitude"])
         result["sensor_id"] = road_data["LINK_ID"]

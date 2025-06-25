@@ -97,72 +97,36 @@ class TrafficData:
         if not self._raw.index.is_monotonic_increasing:
             raise ValueError("Data not sorted by time")
 
-    def reset_data(self) -> None:
-        self.data = self._raw.copy()
-        self._sensor_filter = self.data.columns.to_list()
-        self.__start_time = self.data.index.min()
-        self.__end_time = self.data.index.max()
-
     @property
-    def missings_info(self) -> pd.DataFrame:
-        missings = self._raw.isna()
-        new_sensor_ids = self._raw.columns.intersection(self._sensor_filter)
-        return missings[new_sensor_ids].copy()
+    def selected_sensors(self) -> list[str]:
+        """
+        Returns the list of currently selected sensor IDs.
+        """
+        return self.data.columns.to_list()
 
-    @property
-    def sensor_filter(self) -> list[str]:
-        return self._sensor_filter
-
-    @sensor_filter.setter
-    def sensor_filter(self, sensor_ids: list[str]) -> None:
+    def select_sensors(self, sensor_ids: list[str]) -> None:
+        """
+        Selects sensors from the raw data based on the provided sensor IDs.
+        Updates the data and sensor filter accordingly.
+        """
         new_sensor_ids = self._raw.columns.intersection(sensor_ids)
-        self._sensor_filter = new_sensor_ids
+        missing_sensors = set(sensor_ids) - set(new_sensor_ids)
+        
+        if len(new_sensor_ids) <= 5:
+            logger.info(f"Selected sensors: {new_sensor_ids.tolist()}")
+        else:
+            logger.info(f"Selected {len(new_sensor_ids)} sensors.")
+        
+        if missing_sensors:
+            if len(missing_sensors) <= 5:
+                logger.warning(f"Requested sensors not found: {missing_sensors}")
+            else:
+                logger.warning(f"{len(missing_sensors)} requested sensors not found.")
+        
         self.data = self._raw[new_sensor_ids].copy()
 
-    @property
-    def start_time(self) -> pd.Timestamp:
-        return self.__start_time
-
-    @start_time.setter
-    def start_time(self, start_time: Union[str, pd.Timestamp]) -> None:
-        self.__start_time = pd.Timestamp(start_time)
-        self.data = self.data.loc[self.__start_time :]
-
-    @property
-    def end_time(self) -> pd.Timestamp:
-        return self.__end_time
-
-    @end_time.setter
-    def end_time(self, end_time: Union[str, pd.Timestamp]) -> None:
-        self.__end_time = pd.Timestamp(end_time)
-        self.data = self.data.loc[: self.__end_time]
-
-    @property
-    def original_data(self) -> pd.DataFrame:
-        return self._raw.copy()[self._sensor_filter].loc[
-            self.__start_time : self.__end_time
-        ]
-
-    def remove_outliers(
-        self, processor: Union[OutlierProcessor, List[OutlierProcessor]]
-    ) -> Set[str]:
-        if not isinstance(processor, list):
-            processor = [processor]
-        logger.info("Process Outlier for METR-IMC Traffic data...")
-        failed_set = set()
-        for proc in processor:
-            logger.info(f"Processing with {proc.__class__.__name__}...")
-            self.data = proc.process(self.data)
-            failed_set.update(proc.failed_list)
-        logger.info("Processing Complete")
-        # 언젠가 코드를 리팩토링 해야할 것 같음
-        # Outlier 처리나 Interpolation은 외부로 빼는 것이 좋을 것 같음
-        return failed_set
-
-    def interpolate(self, interpolator: Interpolator):
-        logger.info("Interpolating METR-IMC Traffic data...")
-        self.data = interpolator._interpolate(self.data)
-        logger.info("Interplating Complete")
+    def reset_data(self) -> None:
+        self.data = self._raw.copy()
 
     def to_hdf(self, filepath: str, key: str = "data") -> None:
         logger.info(f"Saving data to {filepath}...")

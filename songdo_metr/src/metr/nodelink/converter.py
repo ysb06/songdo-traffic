@@ -32,25 +32,21 @@ class NodeLinkData:
 
         return NodeLinkData(filtered_nodes, filtered_links, filtered_turns)
 
-    def export(self, output_dir: str, filename_prefix: Optional[str] = None) -> None:
-        node_filename = f"{filename_prefix}_node.shp" if filename_prefix else "node.shp"
-        link_filename = f"{filename_prefix}_link.shp" if filename_prefix else "link.shp"
-        turn_filename = (
-            f"{filename_prefix}_turninfo.dbf" if filename_prefix else "turninfo.dbf"
-        )
-        node_path = os.path.join(output_dir, node_filename)
-        link_path = os.path.join(output_dir, link_filename)
-        turn_path = os.path.join(output_dir, turn_filename)
-
+    def export(
+        self,
+        node_output_path: str,
+        link_output_path: str,
+        turn_output_path: str,
+    ) -> None:
         turn_data = gpd.GeoDataFrame(self.turn_data)
 
         logger.info(f"Exporting datasets...")
-        logger.info(f"Node Data: {node_path}")
-        self.node_data.to_file(node_path, encoding="utf-8")
-        logger.info(f"Link Data: {link_path}")
-        self.link_data.to_file(link_path, encoding="utf-8")
-        logger.info(f"Turn Data: {turn_path}")
-        turn_data.to_file(turn_path, encoding="utf-8")
+        logger.info(f"Node Data: {node_output_path}")
+        self.node_data.to_file(node_output_path, encoding="utf-8")
+        logger.info(f"Link Data: {link_output_path}")
+        self.link_data.to_file(link_output_path, encoding="utf-8")
+        logger.info(f"Turn Data: {turn_output_path}")
+        turn_data.to_file(turn_output_path, encoding="utf-8")
         logger.info("Exporting completed.")
 
     def _filter_data(

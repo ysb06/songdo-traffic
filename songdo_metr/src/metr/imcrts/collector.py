@@ -75,9 +75,9 @@ class IMCRTSCollector:
         self.data = df
         logger.info(f"Data Collecting Finished: {self.data.shape}")
 
-    def to_pickle(self, output_dir: str, file_name: str = "imcrts_data.pkl") -> None:
+    def to_pickle(self, output_path: str) -> None:
         logger.info("Creating Pickle...")
-        self.data.to_pickle(os.path.join(output_dir, file_name))
+        self.data.to_pickle(output_path)
 
     def to_excel(self, output_dir: str, file_name: str = "imcrts_data.xlsx") -> None:
         logger.info("Creating Excel...")

@@ -15,12 +15,6 @@
 		{
 			"path": "project_om",
 			"name": "Project Outliers & Missings"
-		},
-		{
-			"name": "Legacy Code",
-			"path": "../songdo-traffic-legacy"
 		}
-	],
-	"settings": {
-	}
+	]
 }

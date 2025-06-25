@@ -20,14 +20,13 @@ class DistancesImc:
 
     @staticmethod
     def import_from_nodelink(
-        nodelink_dir: str,
-        road_filename: str,
-        turn_filename: str,
+        nodelink_road_path: str,
+        nodelink_turn_path: str,
         target_ids: List[str],
         distance_limit: float,
     ) -> "DistancesImc":
-        road_data = gpd.read_file(os.path.join(nodelink_dir, road_filename))
-        turn_info = gpd.read_file(os.path.join(nodelink_dir, turn_filename))
+        road_data = gpd.read_file(nodelink_road_path)
+        turn_info = gpd.read_file(nodelink_turn_path)
         graph = SensorGraph(road_data, turn_info)
 
         return DistancesImc(graph.generate_distance_data(target_ids, distance_limit))
@@ -37,29 +36,6 @@ class DistancesImc:
         # Initialize sensor_filter as a set of unique sensor IDs from 'from' and 'to' columns
         self._sensor_filter = self._raw[["from", "to"]].stack().unique()
         self.data = self._raw.copy()
-
-    @property
-    def sensor_filter(self) -> List[str]:
-        return list(self._sensor_filter)
-
-    @sensor_filter.setter
-    def sensor_filter(self, sensor_ids: List[str]) -> None:
-        target_id_set = set(sensor_ids)
-        original_id_set = set(self._raw[["from", "to"]].stack().unique())
-
-        missing_sensors = target_id_set - original_id_set
-        if missing_sensors:
-            logger.warning(
-                f"The following sensors do not exist in the data: {', '.join(missing_sensors)}"
-            )
-        new_sensor_ids = target_id_set & original_id_set
-
-        self._sensor_filter = new_sensor_ids
-        # Filter data where both 'from' and 'to' are in new_sensor_ids
-        self.data = self._raw[
-            self._raw["from"].isin(new_sensor_ids)
-            & self._raw["to"].isin(new_sensor_ids)
-        ].copy()
 
     def to_csv(self, filepath: str) -> None:
         logger.info(f"Saving data to {filepath}...")
@@ -106,10 +82,10 @@ class DistancesImc:
         # GeoDataFrame 생성
         gdf = gpd.GeoDataFrame(properties, geometry=geometries, crs="EPSG:4326")
         gdf.to_crs(crs, inplace=True)
-        
+
         # Shapefile로 저장
         gdf.to_file(filepath)
-        
+
         logger.info("Shapefile 생성 완료")
 
 
