@@ -18,7 +18,8 @@ from metr.utils import PathConfig
 
 
 logger = logging.getLogger(__name__)
-path_conf = PathConfig.from_yaml("config.yaml")
+PATH_CONF = PathConfig.from_yaml("config.yaml")
+PATH_CONF.create_directories()
 
 
 # Other Settings
@@ -54,9 +55,9 @@ def generate_raw_dataset():
 
 
 def generate_distances_shapefile(
-    distances_path: str = path_conf.distances_path,
-    sensor_locations_path: str = path_conf.sensor_locations_path,
-    output_path: str = path_conf.distances_shapefile_path,
+    distances_path: str = PATH_CONF.distances_path,
+    sensor_locations_path: str = PATH_CONF.sensor_locations_path,
+    output_path: str = PATH_CONF.distances_shapefile_path,
 ):
     distances = DistancesImc.import_from_csv(distances_path)
     sensor_locations = SensorLocations.import_from_csv(sensor_locations_path)
@@ -64,14 +65,14 @@ def generate_distances_shapefile(
 
 
 def generate_dataset(
-    traffic_data_path: str = path_conf.metr_imc_path,
-    nodelink_link_path: str = path_conf.nodelink_link_path,
-    nodelink_turn_path: str = path_conf.nodelink_turn_path,
-    ids_output_path: str = path_conf.sensor_ids_path,
-    metadata_output_path: str = path_conf.metadata_path,
-    sensor_locations_output_path: str = path_conf.sensor_locations_path,
-    distances_output_path: str = path_conf.distances_path,
-    adj_mx_output_path: str = path_conf.adj_mx_path,
+    traffic_data_path: str = PATH_CONF.metr_imc_path,
+    nodelink_link_path: str = PATH_CONF.nodelink_link_path,
+    nodelink_turn_path: str = PATH_CONF.nodelink_turn_path,
+    ids_output_path: str = PATH_CONF.sensor_ids_path,
+    metadata_output_path: str = PATH_CONF.metadata_path,
+    sensor_locations_output_path: str = PATH_CONF.sensor_locations_path,
+    distances_output_path: str = PATH_CONF.distances_path,
+    adj_mx_output_path: str = PATH_CONF.adj_mx_path,
 ):
     traffic_data = TrafficData.import_from_hdf(traffic_data_path)
 
@@ -108,10 +109,10 @@ def generate_dataset(
 def generate_nodelink_raw(
     nodelink_url: str = NODELINK_RAW_URL,
     region_codes: list[str] = TARGET_REGION_CODES,
-    download_target_dir: str = path_conf.nodelink_dir_path,
-    node_output_path: str = path_conf.nodelink_node_path,
-    link_output_path: str = path_conf.nodelink_link_path,
-    turn_output_path: str = path_conf.nodelink_turn_path,
+    download_target_dir: str = PATH_CONF.nodelink_dir_path,
+    node_output_path: str = PATH_CONF.nodelink_node_path,
+    link_output_path: str = PATH_CONF.nodelink_link_path,
+    turn_output_path: str = PATH_CONF.nodelink_turn_path,
 ):
     logger.info("Downloading Node-Link Data...")
     nodelink_raw_path = download_nodelink(download_target_dir, nodelink_url)
@@ -128,7 +129,7 @@ def generate_imcrts_raw(
     api_key: str = PDP_KEY,
     start_date: str = IMCRTS_START_DATE,
     end_date: str = IMCRTS_END_DATE,
-    imcrts_output_path: str = path_conf.imcrts_path,
+    imcrts_output_path: str = PATH_CONF.imcrts_path,
 ):
     logger.info("Collecting IMCRTS Data...")
     collector = IMCRTSCollector(
@@ -142,9 +143,9 @@ def generate_imcrts_raw(
 
 
 def generate_metr_imc_raw(
-    road_data_path: str = path_conf.nodelink_link_path,
-    traffic_data_path: str = path_conf.imcrts_path,
-    metr_imc_path: str = path_conf.metr_imc_path,
+    road_data_path: str = PATH_CONF.nodelink_link_path,
+    traffic_data_path: str = PATH_CONF.imcrts_path,
+    metr_imc_path: str = PATH_CONF.metr_imc_path,
 ):
     road_data: gpd.GeoDataFrame = gpd.read_file(road_data_path)
     traffic_data = TrafficData.import_from_pickle(traffic_data_path)
@@ -156,9 +157,9 @@ def generate_metr_imc_raw(
 
 
 def generate_metr_imc_shapefile(
-    metr_imc_path: str = path_conf.metr_imc_path,
-    node_link_path: str = path_conf.nodelink_link_path,
-    output_path: str = path_conf.metr_shapefile_path,
+    metr_imc_path: str = PATH_CONF.metr_imc_path,
+    node_link_path: str = PATH_CONF.nodelink_link_path,
+    output_path: str = PATH_CONF.metr_shapefile_path,
 ):
     traffic_data = TrafficData.import_from_hdf(metr_imc_path)
     road_data: gpd.GeoDataFrame = gpd.read_file(node_link_path)

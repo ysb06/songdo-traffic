@@ -1,7 +1,6 @@
 import logging
 
 from metr.pipeline import generate_raw_dataset
-from metr.utils import PathConfig
 
 logging.basicConfig(
     format="%(asctime)s %(name)s [%(levelname)s] %(message)s",
@@ -9,6 +8,4 @@ logging.basicConfig(
     level=logging.INFO,
 )
 
-# generate_raw_dataset()
-config = PathConfig.from_yaml("config.yaml")
-print(config)
+generate_raw_dataset()

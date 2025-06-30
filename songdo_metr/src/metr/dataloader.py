@@ -10,7 +10,7 @@ from torch import Tensor
 from torch.utils.data import ConcatDataset, DataLoader, Subset
 from tqdm import tqdm
 
-from metr.datasets import TrafficDataset, TrafficDataType
+from metr.dataset import TrafficDataset, TrafficDataType
 
 logger = logging.getLogger(__name__)
 

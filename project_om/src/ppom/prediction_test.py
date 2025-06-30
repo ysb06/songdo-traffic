@@ -1,11 +1,9 @@
 import logging
 import os
 import random
-from collections import defaultdict
 from glob import glob
-from typing import Dict, List, Tuple
+from typing import List, Tuple
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
@@ -17,7 +15,6 @@ from lightning.pytorch.callbacks import (
     ModelCheckpoint,
 )
 from lightning.pytorch.loggers import WandbLogger
-from metr.components import TrafficData
 from sklearn.metrics import mean_absolute_error, root_mean_squared_error
 from tqdm import tqdm
 
