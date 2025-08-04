@@ -3,6 +3,7 @@ root_dir: "../datasets/metr-imc"
 
 # Core files
 dataset:
+  dir: "."
   filenames:
     metr_imc: "metr-imc.h5"
     sensor_ids: "metr_ids.txt"

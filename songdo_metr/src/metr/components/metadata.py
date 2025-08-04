@@ -20,6 +20,7 @@ class Metadata:
         road_data = road_data[
             [
                 "LINK_ID",  # 링크ID (Link ID)
+                "ROAD_NAME",  # 도로명 (Road name)
                 "LANES",  # 차로수 (Number of lanes)
                 "ROAD_RANK",  # 도로등급 (Road rank)
                 "ROAD_TYPE",  # 도로유형 (Road type)

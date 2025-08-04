@@ -10,12 +10,20 @@
 			"justMyCode": false
 		},
 		{
-			"name": "Run Tests",
+			"name": "Run Dataset Tests",
 			"type": "debugpy",
 			"request": "launch",
 			"module": "pytest",
 			"console": "integratedTerminal",
 			"args": ["tests", "-s"],
+			"justMyCode": false
+		},
+		{
+			"name": "Run Dataset Validation",
+			"type": "debugpy",
+			"request": "launch",
+			"module": "metr_val",
+			"console": "integratedTerminal",
 			"justMyCode": false
 		}
 	]

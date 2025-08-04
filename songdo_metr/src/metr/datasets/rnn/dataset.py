@@ -8,18 +8,16 @@ from torch.utils.data import Dataset, Subset
 
 logger = logging.getLogger(__name__)
 
+TrafficDataType = Tuple[np.ndarray, np.ndarray, pd.DatetimeIndex, pd.Timestamp]
+
 
 class TrafficCoreDataset(Dataset):
-    """Core dataset class for time-series traffic data. Creates sequences from 1D traffic data for RNN training."""
-
-    def __init__(self, data: np.ndarray, seq_length: int = 24, allow_nan: bool = False):
-        """Core dataset class for time-series traffic data. Creates sequences from 1D traffic data for RNN training.
-
-        Args:
-            data (np.ndarray): 1D array of traffic values
-            seq_length (int, optional): Length of input sequences. Defaults to 24.
-            allow_nan (bool, optional): Whether to allow NaN values in sequences. Defaults to False.
-        """
+    def __init__(
+        self,
+        data: np.ndarray,
+        seq_length: int = 24,
+        allow_nan: bool = False,
+    ):
         super().__init__()
         if len(data) < seq_length:
             raise ValueError("Data length should be larger than seq_length")
@@ -30,7 +28,9 @@ class TrafficCoreDataset(Dataset):
 
         self.cursors: List[int] = []
         time_len = len(self.data)
+        # 1단위(시간)씩 슬라이딩하면서 커서를 생성
         if not allow_nan:
+            # NaN이 있는 경우, NaN이 없는 구간만 커서를 저장
             isnan_arr = np.isnan(self.data).reshape(-1)
             cumsum = np.cumsum(isnan_arr, dtype=np.int32)
             cumsum = np.insert(cumsum, 0, 0)
@@ -41,6 +41,7 @@ class TrafficCoreDataset(Dataset):
             valid_i = all_i[valid_mask]
             self.cursors = valid_i.tolist()
         else:
+            # NaN에 상관없이 모든 데이터의 커서를 저장
             self.cursors = list(range(time_len - seq_length))
 
     def __len__(self) -> int:
@@ -62,33 +63,29 @@ class TrafficCoreDataset(Dataset):
         self.scaled_data = scaler.transform(self.data)
 
 
-class BaseTrafficDataset(TrafficCoreDataset):
-    """Core dataset class for time-series traffic data with time index support. Creates sequences from 1D traffic data for RNN training."""
-
+class TrafficDataset(TrafficCoreDataset):
     def __init__(
         self,
         data: pd.Series,
         seq_length: int = 24,
         allow_nan: bool = False,
     ):
-        """Core dataset class for time-series traffic data with time index support. Creates sequences from 1D traffic data for RNN training.
-
-        Args:
-            data (pd.Series): Time-indexed pandas Series of traffic values
-            seq_length (int, optional): Length of input sequences. Defaults to 24.
-            allow_nan (bool, optional): Whether to allow NaN values in sequences. Defaults to False.
-        """
         super().__init__(data.to_numpy(), seq_length, allow_nan)
         self.data_df = data
 
-    def __getitem__(
-        self,
-        index: int,
-    ) -> Tuple[np.ndarray, np.ndarray, pd.DatetimeIndex, pd.Timestamp]:
+    def __getitem__(self, index: int) -> TrafficDataType:
+        """원래의 numpy기반 데이터를 반환하고 pandas의 시간 인덱스까지 반환.
+
+        Args:
+            index (int): 커서 위치
+
+        Returns:
+            TrafficDataType: x, y 데이터 및 해당 데이터의 index
+        """
         x, y, x_idxs, y_idx = super().__getitem__(index)
 
-        x_time_indices = self.data_df.index[x_idxs]
-        y_time_index = self.data_df.index[y_idx]
+        x_time_indices = self.data_df.index[x_idxs]  # x_idxs = range(i, i+seq_length)
+        y_time_index = self.data_df.index[y_idx]  # y_idx = i + seq_length
 
         return x, y, x_time_indices, y_time_index
 
@@ -116,5 +113,12 @@ class BaseTrafficDataset(TrafficCoreDataset):
             label_times <= end_ts - pd.Timedelta(hours=self.seq_length)
         )
         valid_indices = np.where(mask)[0].tolist()
+
+        # 원래 코드
+        # valid_indices: List[int] = []
+        # for dataset_idx, i in enumerate(self.cursors):
+        #     label_time = self.data_df.index[i + self.seq_length]
+        #     if start_ts <= label_time <= end_ts - pd.Timedelta(hours=self.seq_length):
+        #         valid_indices.append(dataset_idx)
 
         return Subset(self, valid_indices)
