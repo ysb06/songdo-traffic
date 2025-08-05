@@ -111,18 +111,18 @@ class TrafficData:
         """
         new_sensor_ids = self._raw.columns.intersection(sensor_ids)
         missing_sensors = set(sensor_ids) - set(new_sensor_ids)
-        
+
         if len(new_sensor_ids) <= 5:
             logger.info(f"Selected sensors: {new_sensor_ids.tolist()}")
         else:
             logger.info(f"Selected {len(new_sensor_ids)} sensors.")
-        
+
         if missing_sensors:
             if len(missing_sensors) <= 5:
                 logger.warning(f"Requested sensors not found: {missing_sensors}")
             else:
                 logger.warning(f"{len(missing_sensors)} requested sensors not found.")
-        
+
         self.data = self._raw[new_sensor_ids].copy()
 
     def reset_data(self) -> None:
@@ -137,3 +137,13 @@ class TrafficData:
         logger.info(f"Saving data to {filepath}...")
         self.data.to_excel(filepath)
         logger.info(f"Saving Complete...{self.data.shape}")
+
+
+def get_raw(path: str) -> TrafficData:
+    """
+    Load raw traffic data from the specified path.
+    """
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"File not found: {path}")
+
+    return TrafficData.import_from_hdf(path)

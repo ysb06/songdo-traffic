@@ -1,3 +1,1 @@
-from . import PATH_CONF
-
-print(PATH_CONF.dataset.data)
+import metr_val.rnn

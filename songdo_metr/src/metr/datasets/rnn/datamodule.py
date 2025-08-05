@@ -10,6 +10,7 @@ from tqdm import tqdm
 
 from metr.datasets.rnn.dataloader import collate_simple
 from metr.datasets.rnn.dataset import TrafficDataset, TrafficDataType
+from metr.components.metr_imc.traffic_data import get_raw
 
 logger = logging.getLogger(__name__)
 
@@ -19,70 +20,47 @@ CollateFnInput = List[TrafficDataType]
 class TrafficDataModule(L.LightningDataModule):
     def __init__(
         self,
-        training_df: pd.DataFrame,
-        test_df: pd.DataFrame,
+        dataset_path: str,
+        training_start_datetime: str = "2022-11-01 00:00:00",
+        training_end_datetime: str = "2024-07-31 23:59:59",
+        validation_start_datetime: str = "2024-08-01 00:00:00",
+        validation_end_datetime: str = "2024-09-30 23:59:59",
+        test_start_datetime: str = "2024-10-01 00:00:00",
+        test_end_datetime: str = "2024-10-31 23:59:59",
         seq_length: int = 24,
         batch_size: int = 64,
         num_workers: int = 1,
         shuffle_training: bool = True,
-        scaler: MinMaxScaler = MinMaxScaler(feature_range=(0, 1)),
         collate_fn: Callable[[CollateFnInput], Tuple] = collate_simple,
-        valid_split_datetime: Optional[str] = "2024-08-01 00:00:00",
-        training_target_sensor: Optional[List[str]] = None,
+        training_target_sensors: Optional[List[str]] = None,
+        test_target_sensors: Optional[List[str]] = None,
         scale_strictly: bool = False,
     ):
         super().__init__()
-        self.training_df_raw = training_df
-        self.test_df_raw = test_df
+        self.dataset_path = dataset_path
+        self.training_start_datetime = training_start_datetime
+        self.training_end_datetime = training_end_datetime
+        self.validation_start_datetime = validation_start_datetime
+        self.validation_end_datetime = validation_end_datetime
+        self.test_start_datetime = test_start_datetime
+        self.test_end_datetime = test_end_datetime
 
         self.seq_length = seq_length
         self.batch_size = batch_size
         self.num_workers = num_workers
 
-        self.shuffle_training = shuffle_training
-
-        self.collate_fn = collate_fn
-        self.valid_split_datetime = valid_split_datetime
-        self.training_target_sensor = training_target_sensor
-
-        self.scaler = scaler
         self.scale_strictly = scale_strictly
+        self.scaler = MinMaxScaler(feature_range=(0, 1))
 
-        # Setup 단계에서 로드 및 초기화
+        self.shuffle_training = shuffle_training
+        self.collate_fn = collate_fn
+
+        self.training_target_sensors = training_target_sensors
+        self.test_target_sensors = test_target_sensors
+
         self.train_dataset: Optional[ConcatDataset] = None
         self.valid_dataset: Optional[ConcatDataset] = None
         self.test_dataset: Optional[ConcatDataset] = None
-
-    def _create_datasets(self, df: pd.DataFrame) -> List[TrafficDataset]:
-        datasets: List[TrafficDataset] = []
-        for sensor_name, sensor_data in tqdm(
-            df.items(), total=len(df.columns), desc="Creating datasets..."
-        ):
-            dataset = TrafficDataset(
-                sensor_data,
-                seq_length=self.seq_length,
-                allow_nan=False,
-            )
-            if not len(dataset) > 0:
-                logger.warning(f"Dataset {sensor_name} is empty")
-                continue
-            datasets.append(dataset)
-
-        return datasets
-
-    def _split_datasets(self, datasets: List[TrafficDataset], split_datetime: str):
-        train_subsets: List[Subset] = []
-        valid_subsets: List[Subset] = []
-
-        for dataset in datasets:
-            train_subset = dataset.get_subset(end_datetime=split_datetime)
-            valid_subset = dataset.get_subset(start_datetime=split_datetime)
-            if len(train_subset) > 0:
-                train_subsets.append(train_subset)
-            if len(valid_subset) > 0:
-                valid_subsets.append(valid_subset)
-
-        return train_subsets, valid_subsets
 
     def _get_strict_scaler_ref(self, dataset: TrafficDataset) -> np.ndarray:
         x_list = []
@@ -94,78 +72,97 @@ class TrafficDataModule(L.LightningDataModule):
 
         return scaler_ref
 
-    def _get_normal_scaler_ref(self, ref_raw_df: pd.DataFrame, end_datetime: str):
-        scaling_target: pd.DataFrame = ref_raw_df.loc[:, ref_raw_df.columns]
-        if self.valid_split_datetime is not None:
-            scaling_target = scaling_target.loc[:end_datetime]
-
+    def _get_normal_scaler_ref(self, ref_df: pd.DataFrame, end_datetime: str):
+        scaling_target: pd.DataFrame = ref_df.loc[:end_datetime]
         return scaling_target.to_numpy().reshape(-1, 1)
+
+    def _create_sensor_datasets(
+        self, df: pd.DataFrame, allow_nan: bool
+    ) -> List[TrafficDataset]:
+        datasets: List[TrafficDataset] = []
+        for sensor_name, sensor_data in tqdm(
+            df.items(),
+            total=len(df.columns),
+            desc="Creating datasets...",
+        ):
+            dataset = TrafficDataset(
+                sensor_data,
+                seq_length=self.seq_length,
+                allow_nan=allow_nan,
+            )
+            if not len(dataset) > 0:
+                logger.warning(f"Dataset {sensor_name} is empty")
+                continue
+            datasets.append(dataset)
+
+        return datasets
+
+    def _split_df(
+        self,
+        raw_df: pd.DataFrame,
+    ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+        training_df = raw_df.loc[
+            self.training_start_datetime : self.training_end_datetime
+        ]
+        validation_df = raw_df.loc[
+            self.validation_start_datetime : self.validation_end_datetime
+        ]
+        test_df = raw_df.loc[self.test_start_datetime : self.test_end_datetime]
+
+        return training_df, validation_df, test_df
 
     def setup(
         self,
         stage: Optional[Literal["fit", "validate", "test", "predict"]] = None,
     ):
-        logger.info(f"Setting up data module in {stage} stage")
+        # Load and split data
+        raw = get_raw(self.dataset_path)
+        raw_df = raw.data
 
-        # 데이터셋 생성
-        # training_df_raw에서 training_target_sensor에 해당하는 데이터만 사용
-        # training_target_sensor가 None이면 전체 데이터 사용
-        training_targets: pd.DataFrame = self.training_df_raw
-        if self.training_target_sensor is not None:
-            training_targets = self.training_df_raw.loc[:, self.training_target_sensor]
+        training_df, validation_df, test_df = self._split_df(raw_df)
+        if self.training_target_sensors is not None:
+            training_df = training_df.loc[:, self.training_target_sensors]
+            validation_df = validation_df.loc[:, self.training_target_sensors]
+        if self.test_target_sensors is not None:
+            test_df = test_df.loc[:, self.test_target_sensors]
 
-        all_datasets: List[TrafficDataset] = []
-        # Train, Valid 데이터셋 생성
-        training_datasets = self._create_datasets(training_targets)
-        all_datasets.extend(training_datasets)
-        # Test 데이터셋 생성
-        test_datasets = self._create_datasets(self.test_df_raw)
-        all_datasets.extend(test_datasets)
+        # Create datasets
+        training_sensor_datasets = self._create_sensor_datasets(
+            training_df,
+            allow_nan=False,
+        )
+        validation_sensor_datasets = self._create_sensor_datasets(
+            validation_df,
+            allow_nan=False,
+        )
+        test_sensor_datasets = self._create_sensor_datasets(
+            test_df,
+            allow_nan=False,
+        )
 
-        # Train과 Valid는 시간 기준으로 분리
-        # 마지막 달이 Valid 데이터
-        logger.info(f"Splitting to valid datasets...")
-        training_subsets = []
-        validation_subsets = []
-        if self.valid_split_datetime is not None:
-            training_subsets, validation_subsets = self._split_datasets(
-                training_datasets,
-                self.valid_split_datetime,
-            )
-        else:
-            training_subsets = training_datasets
+        # Concatenate datasets
+        self.training_dataset = ConcatDataset(training_sensor_datasets)
+        self.validation_dataset = ConcatDataset(validation_sensor_datasets)
+        self.test_dataset = ConcatDataset(test_sensor_datasets)
 
-        # 모두 연결
-        # 이상치는 모두 제거된 상태여야 함
-        logger.info(f"Concatenating datasets...")
-        self.train_dataset = ConcatDataset(training_subsets)
-        if len(validation_subsets) > 0:
-            self.valid_dataset = ConcatDataset(validation_subsets)
-        if len(test_datasets) > 0:
-            self.test_dataset = ConcatDataset(test_datasets)
-
-        # Scaler 적용
-        logger.info(f"Fitting scaler...")
-        ref_data: Optional[np.ndarray] = None
+        # Scaler fitting
         if self.scale_strictly:
-            # 엄밀하게는 이렇게 해야하지만, 너무 오래 걸림
-            ref_data = self._get_strict_scaler_ref(self.train_dataset)
+            ref_data = self._get_strict_scaler_ref(self.training_dataset)
         else:
-            end_datetime = self.valid_split_datetime
-            if self.valid_split_datetime is None:
-                end_datetime = training_targets.index[-1]
-            ref_data = self._get_normal_scaler_ref(self.training_df_raw, end_datetime)
+            ref_data = self._get_normal_scaler_ref(
+                training_df, self.training_end_datetime
+            )
         self.scaler.fit(ref_data)
 
-        logger.info(f"Applying scaler...")
-        for dataset in all_datasets:
+        # Apply scaler to datasets
+        for dataset in (
+            training_sensor_datasets + validation_sensor_datasets + test_sensor_datasets
+        ):
             dataset.apply_scaler(self.scaler)
-
-        logger.info(f"Setup complete")
 
     def train_dataloader(self) -> DataLoader:
         return DataLoader(
-            self.train_dataset,
+            self.training_dataset,
             batch_size=self.batch_size,
             shuffle=self.shuffle_training,
             num_workers=self.num_workers,
@@ -174,7 +171,7 @@ class TrafficDataModule(L.LightningDataModule):
 
     def val_dataloader(self) -> DataLoader:
         return DataLoader(
-            self.valid_dataset,
+            self.validation_dataset,
             batch_size=self.batch_size,
             shuffle=False,
             num_workers=self.num_workers,
@@ -182,15 +179,6 @@ class TrafficDataModule(L.LightningDataModule):
         )
 
     def test_dataloader(self) -> DataLoader:
-        return DataLoader(
-            self.test_dataset,
-            batch_size=self.batch_size,
-            shuffle=False,
-            num_workers=self.num_workers,
-            collate_fn=self.collate_fn,
-        )
-
-    def predict_dataloader(self) -> DataLoader:
         return DataLoader(
             self.test_dataset,
             batch_size=self.batch_size,
