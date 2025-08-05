@@ -13,7 +13,7 @@ from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint
 from lightning.pytorch.loggers import CSVLogger
 
 from metr.dataloader import TrafficDataModule, collate_simple
-from metr_val.models import BasicRNN
+from metr_val.model import BasicRNN
 
 logger = logging.getLogger(__name__)
 

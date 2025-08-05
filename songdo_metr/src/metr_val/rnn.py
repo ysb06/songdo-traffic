@@ -14,8 +14,8 @@ from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint
 from lightning.pytorch.loggers import CSVLogger
 
 from metr.datasets.rnn.datamodule import TrafficDataModule
-from metr_val.models import BasicRNN
-from . import PATH_CONF
+from metr_val.model import BasicRNN
+from metr_val import PATH_CONF
 
 logger = logging.getLogger(__name__)
 
