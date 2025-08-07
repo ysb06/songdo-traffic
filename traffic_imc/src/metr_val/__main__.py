@@ -7,7 +7,7 @@ from lightning.pytorch.callbacks import (
     LearningRateMonitor,
     ModelCheckpoint,
 )
-
+from stgcn.model.models import STGCNGraphConv
 
 def main():
     rnn_data = SimpleTrafficDataModule("./data/selected_small_v1/metr-imc.h5")
@@ -38,5 +38,5 @@ def main():
     trainer.test(rnn_model, rnn_data)
 
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()
