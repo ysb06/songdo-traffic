@@ -14,6 +14,10 @@ license = {text = "MIT"}
 [tool.pdm]
 distribution = false
 
+[tool.pdm.scripts]
+post_install = "python scripts/post_update.py"
+copy-stgcn = "python scripts/post_update.py"
+
 [tool.pdm.dev-dependencies]
 dev = [
     "-e file:///${PROJECT_ROOT}/../songdo_metr#egg=songdo-metr",
