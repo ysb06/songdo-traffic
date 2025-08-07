@@ -1,4 +1,4 @@
-from metr.datasets.rnn.datamodule import TrafficDataModule
+from metr.datasets.rnn.datamodule import SimpleTrafficDataModule
 from .models.rnn import LSTMLightningModule
 from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch import Trainer
@@ -10,7 +10,7 @@ from lightning.pytorch.callbacks import (
 
 
 def main():
-    rnn_data = TrafficDataModule("./data/selected_small_v1/metr-imc.h5")
+    rnn_data = SimpleTrafficDataModule("./data/selected_small_v1/metr-imc.h5")
     rnn_model = LSTMLightningModule(scaler=rnn_data.scaler)
 
     output_dir = "./output/rnn"
@@ -34,7 +34,6 @@ def main():
             LearningRateMonitor(logging_interval="step"),
         ],
     )
-
     trainer.fit(rnn_model, rnn_data)
     trainer.test(rnn_model, rnn_data)
 

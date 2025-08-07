@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 CollateFnInput = List[TrafficDataType]
 
 
-class TrafficDataModule(L.LightningDataModule):
+class SimpleTrafficDataModule(L.LightningDataModule):
     def __init__(
         self,
         dataset_path: str,
