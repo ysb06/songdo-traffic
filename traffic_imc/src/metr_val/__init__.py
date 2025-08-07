@@ -8,6 +8,6 @@ traffic prediction models using the METR dataset format.
 from .utils import PathConfig
 
 
-PATH_CONF = PathConfig("config.yaml")
+PATH_CONF = PathConfig("../config.yaml")
 
 __all__ = ["PATH_CONF"]

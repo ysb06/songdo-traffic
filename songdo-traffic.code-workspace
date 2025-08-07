@@ -15,6 +15,10 @@
 		{
 			"path": "project_om",
 			"name": "Project Outliers & Missings"
+		},
+		{
+			"path": "traffic_imc",
+			"name": "Traffic-IMC"
 		}
 	]
 }

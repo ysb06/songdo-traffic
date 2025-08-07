@@ -17,14 +17,6 @@
 			"console": "integratedTerminal",
 			"args": ["tests", "-s"],
 			"justMyCode": false
-		},
-		{
-			"name": "Run Dataset Validation",
-			"type": "debugpy",
-			"request": "launch",
-			"module": "metr_val",
-			"console": "integratedTerminal",
-			"justMyCode": false
 		}
 	]
 }

@@ -1,7 +1,7 @@
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Union
 import yaml
 
 
@@ -37,6 +37,9 @@ class PathConfig:
     metr_shapefile_path: str
     distances_shapefile_path: str
 
+    # Path Raws
+    raw: Dict[str, Any]
+
     @classmethod
     def from_yaml(cls, config_path: str = None) -> "PathConfig":
         """Create PathConfig from YAML file"""
@@ -46,12 +49,12 @@ class PathConfig:
             config_path = current_dir.parent.parent / "config.yaml"
 
         with open(config_path, "r", encoding="utf-8") as f:
-            config = yaml.safe_load(f)
+            config: Dict[str, Any] = yaml.safe_load(f)
 
         return cls._build_from_config(config)
 
     @classmethod
-    def _build_from_config(cls, config: Dict[str, str]) -> "PathConfig":
+    def _build_from_config(cls, config: Dict[str, Any]) -> "PathConfig":
         """Build PathConfig from configuration dictionary"""
         root_dir = config["root_dir"]
 
@@ -107,6 +110,7 @@ class PathConfig:
             metr_excel_path=metr_excel_path,
             metr_shapefile_path=metr_shapefile_path,
             distances_shapefile_path=distances_shapefile_path,
+            raw=config,
         )
 
     def create_directories(self):

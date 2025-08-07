@@ -18,7 +18,7 @@ from metr.utils import PathConfig
 
 
 logger = logging.getLogger(__name__)
-PATH_CONF = PathConfig.from_yaml("config.yaml")
+PATH_CONF = PathConfig.from_yaml("../config.yaml")
 PATH_CONF.create_directories()
 
 
@@ -40,6 +40,42 @@ TARGET_REGION_CODES = [
 ]  # All Incheon Regions
 IMCRTS_START_DATE = "20221101"
 IMCRTS_END_DATE = "20250310"
+
+
+def generate_subset_dataset(
+    target_nodelink: list[str],
+    save_dir_path: str,
+):
+    metr_imc_filename = PATH_CONF.raw["dataset"]["filenames"]["metr_imc"]
+    sensor_ids_filename = PATH_CONF.raw["dataset"]["filenames"]["sensor_ids"]
+    metadata_filename = PATH_CONF.raw["dataset"]["filenames"]["metadata"]
+    sensor_locations_filename = PATH_CONF.raw["dataset"]["filenames"][
+        "sensor_locations"
+    ]
+    distances_filename = PATH_CONF.raw["dataset"]["filenames"]["distances"]
+    adjacency_matrix_filename = PATH_CONF.raw["dataset"]["filenames"][
+        "adjacency_matrix"
+    ]
+
+    metr_imc_save_path = os.path.join(save_dir_path, metr_imc_filename)
+    sensor_ids_save_path = os.path.join(save_dir_path, sensor_ids_filename)
+    metadata_save_path = os.path.join(save_dir_path, metadata_filename)
+    sensor_locations_save_path = os.path.join(save_dir_path, sensor_locations_filename)
+    distances_save_path = os.path.join(save_dir_path, distances_filename)
+    adj_mx_save_path = os.path.join(save_dir_path, adjacency_matrix_filename)
+
+    traffic_data = TrafficData.import_from_hdf(PATH_CONF.metr_imc_path)
+    traffic_data.select_sensors(target_nodelink)
+    traffic_data.to_hdf(metr_imc_save_path)
+
+    generate_dataset(
+        traffic_data_path=metr_imc_save_path,
+        ids_output_path=sensor_ids_save_path,
+        metadata_output_path=metadata_save_path,
+        sensor_locations_output_path=sensor_locations_save_path,
+        distances_output_path=distances_save_path,
+        adj_mx_output_path=adj_mx_save_path,
+    )
 
 
 def generate_raw_dataset():
