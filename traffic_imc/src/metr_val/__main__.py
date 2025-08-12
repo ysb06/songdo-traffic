@@ -7,7 +7,6 @@ from lightning.pytorch.callbacks import (
     LearningRateMonitor,
     ModelCheckpoint,
 )
-from stgcn.model.models import STGCNGraphConv
 
 def main():
     rnn_data = SimpleTrafficDataModule("./data/selected_small_v1/metr-imc.h5")
@@ -17,7 +16,7 @@ def main():
     wandb_logger = WandbLogger(project="Traffic-IMC", log_model="all")
 
     trainer = Trainer(
-        max_epochs=3,
+        max_epochs=100,
         accelerator="auto",
         devices="auto",
         default_root_dir=output_dir,
@@ -38,5 +37,5 @@ def main():
     trainer.test(rnn_model, rnn_data)
 
 
-# if __name__ == "__main__":
-#     main()
+if __name__ == "__main__":
+    main()

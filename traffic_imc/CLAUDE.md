@@ -4,7 +4,30 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a traffic prediction project using PyTorch Lightning and LSTM models for time series forecasting on the Songdo traffic dataset. The project structure follows a Python package layout with PDM for dependency management.
+This is a traffic prediction project (`traffic_imc`) that implements and validates machine learning models for traffic flow forecasting using the METR-IMC dataset. The project focuses on comparing different neural network architectures, particularly LSTM-based RNN models and Spatio-Temporal Graph Convolutional Networks (STGCN).
+
+## Architecture
+
+### Package Structure
+- `src/metr_val/`: Main package containing model implementations and utilities
+  - `models/`: Neural network model implementations
+    - `rnn.py`: LSTM-based models with PyTorch Lightning wrapper (`LSTMLightningModule`, `LSTMBaseModel`)
+    - `stgcn/`: Spatio-Temporal Graph Convolutional Network implementation (copied from third-party)
+  - `__main__.py`: Main training script that trains RNN models using Lightning Trainer
+  - `test_performance.py`: Performance evaluation utilities for RNN models
+  - `utils.py`: Configuration utilities including `PathConfig` for YAML-based path management
+
+### Data Flow
+1. Traffic data is loaded from HDF5 format (`data/selected_small_v1/metr-imc.h5`)
+2. Data preprocessing handled by external `metr.datasets` package dependency
+3. Models trained using PyTorch Lightning with WandB logging
+4. Results saved to `output/` directory with model checkpoints
+
+### Key Dependencies
+- External package: `songdo-metr` (local development dependency for data handling)
+- PyTorch Lightning for training infrastructure
+- WandB for experiment tracking and logging
+- Third-party STGCN implementation in `../third_party/stgcn/model/`
 
 ## Development Commands
 
@@ -13,66 +36,44 @@ This is a traffic prediction project using PyTorch Lightning and LSTM models for
 # Install dependencies with PDM
 pdm install
 
-# Activate virtual environment  
-pdm shell
-# or use: source .venv/bin/activate
+# Copy STGCN model files from third-party (run after install)
+pdm run copy-stgcn
+# or manually:
+python scripts/post_update.py
 ```
 
-### Running the Model
+### Training and Evaluation
 ```bash
-# Run training (main entry point)
-python -m metr_val
+# Run main RNN training
+python -m src.metr_val
 
 # Run performance testing
-python -m metr_val.test_performance
-
-# With custom parameters
-python -m metr_val.test_performance --seq_length 48 --hidden_size 128 --max_epochs 50
+python -m src.metr_val.test_performance --data_dir ../datasets/metr-imc --results_dir ./rnn_results
 ```
 
-### Data Requirements
-- Traffic data should be placed in `./data/selected_small/metr-imc.h5`
-- The project expects HDF5 format data files
-- Additional supporting files: `adj_mx.pkl`, `distances_imc.csv`, `graph_sensor_locations.csv`, `metadata.h5`
+### Third-Party Integration
+The project uses a post-install script (`scripts/post_update.py`) that automatically copies STGCN model files from `../third_party/stgcn/model/` to `src/metr_val/models/stgcn/` and fixes import statements for proper relative imports.
 
-## Code Architecture
+## Key Implementation Details
 
-### Core Components
+### Model Architecture
+- **RNN Models**: LSTM-based with configurable hidden size, layers, and dropout
+- **STGCN Models**: Two variants using different graph convolution approaches (Chebyshev polynomials vs standard GraphConv)
+- Both models support PyTorch Lightning training with automatic metric logging
 
-**Main Training Module** (`src/metr_val/__main__.py`):
-- Entry point for model training
-- Configures PyTorch Lightning Trainer with Weights & Biases logging
-- Uses TrafficDataModule from external `metr` package for data loading
+### Data Handling
+- Uses external `metr.datasets.rnn.datamodule.SimpleTrafficDataModule` for data loading
+- Supports scaling/normalization with sklearn MinMaxScaler
+- Metrics calculated on both scaled and original data ranges
 
-**LSTM Model** (`src/metr_val/models/rnn.py`):
-- `LSTMLightningModule`: Lightning wrapper with training/validation/test steps
-- `LSTMBaseModel`: Core PyTorch LSTM implementation
-- Supports both scaled and original scale metrics (MAE, RMSE, MAPE)
-- Built-in MinMaxScaler integration for data normalization
+### Experiment Tracking
+- WandB integration for experiment logging (project: "Traffic-IMC")
+- Model checkpointing with early stopping based on validation loss
+- CSV logging available as alternative to WandB
 
-**Performance Testing** (`src/metr_val/test_performance.py`):
-- Comprehensive model evaluation framework
-- Command-line interface for hyperparameter tuning
-- Automated CSV data loading and Lightning integration
-- Results logging and model checkpointing
+## Important Notes
 
-**Utilities** (`src/metr_val/utils.py`):
-- `PathConfig`: YAML-based configuration management
-- Support for nested path configurations with attribute and dictionary access
-
-### External Dependencies
-- Depends on external `songdo-metr` package (installed as editable dependency)
-- Uses `metr.datasets.rnn.datamodule.TrafficDataModule` for data handling
-- Weights & Biases integration for experiment tracking
-
-### Model Configuration
-- Default sequence length: 24 timesteps
-- LSTM hidden size: 64 units
-- Number of layers: 2
-- Early stopping with validation loss monitoring
-- Learning rate scheduling with ReduceLROnPlateau
-
-### Output Structure
-- Model checkpoints saved to `./output/rnn/`
-- Weights & Biases logs project: "Traffic-IMC"
-- Performance test results in configurable results directory
+- The project depends on a local `songdo-metr` package that must be available in the parent directory
+- STGCN models require manual copying from third-party sources via the post-install script
+- Training outputs include both scaled metrics (for model comparison) and original scale metrics (for real-world interpretation)
+- All model training uses automatic device detection (GPU if available)
