@@ -1,15 +1,17 @@
-from metr.datasets.rnn.datamodule import SimpleTrafficDataModule
-from .models.rnn import LSTMLightningModule
-from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch import Trainer
 from lightning.pytorch.callbacks import (
     EarlyStopping,
     LearningRateMonitor,
     ModelCheckpoint,
 )
+from lightning.pytorch.loggers import WandbLogger
+from metr.datasets.rnn.datamodule import MultiSensorTrafficDataModule
+
+from .models.rnn.module import LSTMLightningModule
+
 
 def main():
-    rnn_data = SimpleTrafficDataModule("./data/selected_small_v1/metr-imc.h5")
+    rnn_data = MultiSensorTrafficDataModule("./data/selected_small_v1/metr-imc.h5")
     rnn_model = LSTMLightningModule(scaler=rnn_data.scaler)
 
     output_dir = "./output/rnn"

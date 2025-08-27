@@ -9,6 +9,9 @@ from torch.utils.data import Dataset, Subset
 logger = logging.getLogger(__name__)
 
 TrafficDataType = Tuple[np.ndarray, np.ndarray, pd.DatetimeIndex, pd.Timestamp]
+TrafficMultiSensorDataType = Tuple[
+    np.ndarray, np.ndarray, pd.DatetimeIndex, pd.Timestamp, str
+]
 
 
 class TrafficCoreDataset(Dataset):
@@ -47,10 +50,7 @@ class TrafficCoreDataset(Dataset):
     def __len__(self) -> int:
         return len(self.cursors)
 
-    def __getitem__(self, index: int):
-        return self._getitem(self.cursors[index])
-
-    def _getitem(self, index: int) -> Tuple[np.ndarray, np.ndarray, List[int], int]:
+    def __getitem__(self, index: int) -> Tuple[np.ndarray, np.ndarray, List[int], int]:
         x = self.scaled_data[index : index + self.seq_length]
         y = self.scaled_data[index + self.seq_length]
 
@@ -114,11 +114,56 @@ class TrafficDataset(TrafficCoreDataset):
         )
         valid_indices = np.where(mask)[0].tolist()
 
-        # 원래 코드
-        # valid_indices: List[int] = []
-        # for dataset_idx, i in enumerate(self.cursors):
-        #     label_time = self.data_df.index[i + self.seq_length]
-        #     if start_ts <= label_time <= end_ts - pd.Timedelta(hours=self.seq_length):
-        #         valid_indices.append(dataset_idx)
-
         return Subset(self, valid_indices)
+
+
+class TrafficMultiSensorDataset(Dataset):
+    """다중 센서 데이터를 처리하는 데이터셋 클래스.
+
+    DataFrame의 각 컬럼이 서로 다른 센서를 나타내는 경우 사용.
+    각 샘플마다 센서 이름 정보도 함께 반환.
+    """
+
+    def __init__(
+        self,
+        data: pd.DataFrame,
+        seq_length: int = 24,
+        allow_nan: bool = False,
+    ):
+        super().__init__()
+        self.data_df = data
+        self.seq_length = seq_length
+        self.sensor_names = list(data.columns)
+
+        # 각 센서별로 TrafficDataset을 생성
+        self.sensor_datasets: dict[str, TrafficDataset] = {}
+        self.sensor_sample_counts: dict[str, int] = {}
+
+        for sensor_name in self.sensor_names:
+            sensor_series = data[sensor_name]
+            sensor_dataset = TrafficDataset(sensor_series, seq_length, allow_nan)
+            self.sensor_datasets[sensor_name] = sensor_dataset
+            self.sensor_sample_counts[sensor_name] = len(sensor_dataset)
+
+        # 센서별 샘플 인덱스 매핑 생성
+        self._create_index_mapping()
+
+    def _create_index_mapping(self):
+        """전체 인덱스를 (센서명, 센서내 인덱스)로 매핑하는 테이블 생성"""
+        self.index_mapping = []
+
+        for sensor_name in self.sensor_names:
+            sensor_sample_count = self.sensor_sample_counts[sensor_name]
+            for i in range(sensor_sample_count):
+                self.index_mapping.append((sensor_name, i))
+
+    def __len__(self) -> int:
+        return sum(self.sensor_sample_counts.values())
+
+    def __getitem__(self, index: int) -> TrafficMultiSensorDataType:
+        sensor_name, sensor_index = self.index_mapping[index]
+        sensor_dataset = self.sensor_datasets[sensor_name]
+
+        x, y, x_time_indices, y_time_index = sensor_dataset[sensor_index]
+
+        return x, y, x_time_indices, y_time_index, sensor_name

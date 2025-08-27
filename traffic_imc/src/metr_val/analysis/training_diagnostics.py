@@ -1,6 +1,6 @@
 """
 Training diagnostics and model performance analysis
-Analyzes training curves, convergence patterns, and prediction intervals
+Analyzes training curves, convergence patterns, and prediction intervals with Plotly-based interactive visualizations
 """
 
 import os
@@ -12,11 +12,9 @@ warnings.filterwarnings('ignore')
 
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
 import plotly.graph_objects as go
-import plotly.express as px
 from plotly.subplots import make_subplots
+import plotly.figure_factory as ff
 
 
 class TrainingDiagnostics:
@@ -31,10 +29,13 @@ class TrainingDiagnostics:
         """
         self.results_dir = Path(results_dir)
         self.results_dir.mkdir(exist_ok=True)
-        (self.results_dir / "plots").mkdir(exist_ok=True)
         (self.results_dir / "interactive").mkdir(exist_ok=True)
         
-        plt.style.use('seaborn-v0_8')
+        # Plotly configuration
+        self.color_palette = [
+            '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', 
+            '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'
+        ]  # Use hex colors to avoid conversion issues
         
     def load_training_logs(self, log_path: str) -> pd.DataFrame:
         """
@@ -62,15 +63,39 @@ class TrainingDiagnostics:
         
         return df
     
-    def plot_training_curves(self, log_data: pd.DataFrame, save_name: str = "training_curves"):
+    def _hex_to_rgba(self, hex_color: str, alpha: float = 1.0) -> str:
         """
-        Plot training and validation curves
+        Convert hex color to rgba string safely
+        
+        Args:
+            hex_color: Hex color string (e.g., '#1f77b4')
+            alpha: Alpha value (0.0 to 1.0)
+            
+        Returns:
+            RGBA color string
+        """
+        try:
+            # Remove # if present
+            hex_color = hex_color.lstrip('#')
+            
+            # Convert hex to RGB
+            r = int(hex_color[0:2], 16)
+            g = int(hex_color[2:4], 16)
+            b = int(hex_color[4:6], 16)
+            
+            return f'rgba({r},{g},{b},{alpha})'
+        except (ValueError, IndexError):
+            # Fallback to a default color
+            return f'rgba(31,119,180,{alpha})'  # Default blue
+    
+    def create_training_curves_dashboard(self, log_data: pd.DataFrame):
+        """
+        Create interactive training curves dashboard
         
         Args:
             log_data: DataFrame with training metrics
-            save_name: Name for saved plot file
         """
-        print("Creating training curves plot...")
+        print("Creating interactive training curves dashboard...")
         
         # Identify available metrics
         metric_columns = [col for col in log_data.columns if any(metric in col.lower() 
@@ -80,55 +105,101 @@ class TrainingDiagnostics:
         train_metrics = [col for col in metric_columns if 'train' in col.lower()]
         val_metrics = [col for col in metric_columns if 'val' in col.lower()]
         
-        # Create subplots based on available metrics
-        n_metrics = max(len(train_metrics), len(val_metrics))
-        if n_metrics == 0:
+        if not train_metrics and not val_metrics:
             print("No training metrics found in log data")
             return
             
-        fig, axes = plt.subplots(n_metrics, 1, figsize=(12, 4 * n_metrics))
-        if n_metrics == 1:
-            axes = [axes]
-            
-        fig.suptitle('Training Progress: Loss and Metrics Over Time', fontsize=16)
+        # Create subplot structure
+        n_metrics = max(len(train_metrics), len(val_metrics))
+        subplot_titles = []
         
-        # Plot each metric
-        for i, (train_col, val_col) in enumerate(zip(train_metrics, val_metrics)):
-            ax = axes[i] if i < len(axes) else axes[-1]
+        for i in range(n_metrics):
+            if i < len(train_metrics):
+                metric_name = train_metrics[i].replace('train_', '').replace('val_', '').upper()
+                subplot_titles.append(f'{metric_name} Progress')
+            else:
+                subplot_titles.append(f'Metric {i+1} Progress')
+        
+        fig = make_subplots(
+            rows=n_metrics, cols=1,
+            subplot_titles=subplot_titles,
+            vertical_spacing=0.1/n_metrics if n_metrics > 1 else 0.1,
+            shared_xaxes=True
+        )
+        
+        # Plot each metric pair
+        for i in range(n_metrics):
+            row = i + 1
             
             # Plot training metric
-            if train_col in log_data.columns:
-                train_data = log_data[train_col].dropna()
+            if i < len(train_metrics) and train_metrics[i] in log_data.columns:
+                train_data = log_data[train_metrics[i]].dropna()
                 if len(train_data) > 0:
-                    ax.plot(train_data.index, train_data.values, 
-                           label=f'Training {train_col}', alpha=0.8, linewidth=2)
+                    fig.add_trace(
+                        go.Scatter(
+                            x=train_data.index,
+                            y=train_data.values,
+                            mode='lines',
+                            name=f'Training {train_metrics[i].replace("train_", "")}',
+                            line=dict(color=self.color_palette[0], width=2),
+                            legendgroup=f"metric_{i}"
+                        ),
+                        row=row, col=1
+                    )
             
             # Plot validation metric
-            if val_col in log_data.columns:
-                val_data = log_data[val_col].dropna()
+            if i < len(val_metrics) and val_metrics[i] in log_data.columns:
+                val_data = log_data[val_metrics[i]].dropna()
                 if len(val_data) > 0:
-                    ax.plot(val_data.index, val_data.values, 
-                           label=f'Validation {val_col}', alpha=0.8, linewidth=2)
-            
-            ax.set_title(f'{train_col.replace("train_", "").replace("val_", "").upper()} Progress')
-            ax.set_xlabel('Epoch/Step')
-            ax.set_ylabel('Value')
-            ax.legend()
-            ax.grid(True, alpha=0.3)
-            
-            # Add smoothed trend line
-            if val_col in log_data.columns:
-                val_data = log_data[val_col].dropna()
-                if len(val_data) > 10:  # Only if enough data points
-                    window = max(1, len(val_data) // 10)
-                    smoothed = val_data.rolling(window=window, center=True).mean()
-                    ax.plot(smoothed.index, smoothed.values, 
-                           '--', alpha=0.6, label=f'Smoothed {val_col}')
-                    ax.legend()
+                    fig.add_trace(
+                        go.Scatter(
+                            x=val_data.index,
+                            y=val_data.values,
+                            mode='lines',
+                            name=f'Validation {val_metrics[i].replace("val_", "")}',
+                            line=dict(color=self.color_palette[1], width=2),
+                            legendgroup=f"metric_{i}"
+                        ),
+                        row=row, col=1
+                    )
+                    
+                    # Add smoothed trend line if enough data points
+                    if len(val_data) > 10:
+                        window = max(1, len(val_data) // 10)
+                        smoothed = val_data.rolling(window=window, center=True).mean()
+                        fig.add_trace(
+                            go.Scatter(
+                                x=smoothed.index,
+                                y=smoothed.values,
+                                mode='lines',
+                                name=f'Smoothed {val_metrics[i].replace("val_", "")}',
+                                line=dict(color=self.color_palette[2], width=1, dash='dash'),
+                                opacity=0.7,
+                                legendgroup=f"metric_{i}"
+                            ),
+                            row=row, col=1
+                        )
         
-        plt.tight_layout()
-        plt.savefig(self.results_dir / "plots" / f"{save_name}.png", dpi=300, bbox_inches='tight')
-        plt.show()
+        # Update layout
+        fig.update_layout(
+            height=300 * n_metrics + 100,
+            title_text="Interactive Training Progress Dashboard",
+            showlegend=True,
+            hovermode='x unified'
+        )
+        
+        # Update x-axis label only for bottom subplot
+        fig.update_xaxes(title_text="Epoch/Step", row=n_metrics, col=1)
+        
+        # Update y-axis labels
+        for i in range(n_metrics):
+            fig.update_yaxes(title_text="Value", row=i+1, col=1)
+        
+        # Save and show
+        fig.write_html(self.results_dir / "interactive" / "training_curves_dashboard.html")
+        fig.show()
+        
+        print(f"Interactive training curves dashboard saved to: {self.results_dir / 'interactive' / 'training_curves_dashboard.html'}")
         
     def analyze_convergence(self, log_data: pd.DataFrame) -> Dict:
         """
@@ -226,106 +297,215 @@ class TrainingDiagnostics:
         
         return analysis
     
-    def plot_convergence_analysis(self, log_data: pd.DataFrame, convergence_info: Dict):
+    def create_convergence_analysis_dashboard(self, log_data: pd.DataFrame, convergence_info: Dict):
         """
-        Create detailed convergence analysis plots
+        Create detailed interactive convergence analysis dashboard
         
         Args:
             log_data: DataFrame with training metrics
             convergence_info: Results from analyze_convergence
         """
-        print("Creating convergence analysis plots...")
-        
-        fig, axes = plt.subplots(2, 2, figsize=(16, 12))
-        fig.suptitle('Model Convergence Analysis', fontsize=16)
+        print("Creating interactive convergence analysis dashboard...")
         
         # Find loss columns
         val_loss_cols = [col for col in log_data.columns if 'val' in col.lower() and 'loss' in col.lower()]
         train_loss_cols = [col for col in log_data.columns if 'train' in col.lower() and 'loss' in col.lower()]
+        lr_cols = [col for col in log_data.columns if 'lr' in col.lower() or 'learning_rate' in col.lower()]
+        
+        # Create subplot grid
+        fig = make_subplots(
+            rows=2, cols=2,
+            subplot_titles=('Training Progress with Best Epoch', 'Cumulative Loss Improvement',
+                          'Validation Loss Change Rate', 'Learning Rate Schedule' if lr_cols else 'Loss Distribution'),
+            specs=[[{"secondary_y": False}, {"secondary_y": False}],
+                   [{"secondary_y": False}, {"secondary_y": False}]]
+        )
         
         if val_loss_cols:
             val_loss = log_data[val_loss_cols[0]].dropna()
             
             # 1. Loss curve with best epoch marked
-            axes[0, 0].plot(val_loss.index, val_loss.values, label='Validation Loss', linewidth=2)
+            fig.add_trace(
+                go.Scatter(
+                    x=val_loss.index,
+                    y=val_loss.values,
+                    mode='lines',
+                    name='Validation Loss',
+                    line=dict(color=self.color_palette[0], width=2)
+                ),
+                row=1, col=1
+            )
+            
             if train_loss_cols:
                 train_loss = log_data[train_loss_cols[0]].dropna()
-                axes[0, 0].plot(train_loss.index, train_loss.values, label='Training Loss', linewidth=2)
+                fig.add_trace(
+                    go.Scatter(
+                        x=train_loss.index,
+                        y=train_loss.values,
+                        mode='lines',
+                        name='Training Loss',
+                        line=dict(color=self.color_palette[1], width=2)
+                    ),
+                    row=1, col=1
+                )
             
             # Mark best epoch
             best_epoch = convergence_info.get('best_epoch', 0)
             best_loss = convergence_info.get('best_val_loss', 0)
-            axes[0, 0].scatter([best_epoch], [best_loss], color='red', s=100, zorder=5, 
-                             label=f'Best Epoch ({best_epoch})')
-            axes[0, 0].set_title('Training Progress with Best Epoch')
-            axes[0, 0].set_xlabel('Epoch')
-            axes[0, 0].set_ylabel('Loss')
-            axes[0, 0].legend()
-            axes[0, 0].grid(True, alpha=0.3)
+            if best_epoch < len(val_loss):
+                fig.add_trace(
+                    go.Scatter(
+                        x=[best_epoch],
+                        y=[best_loss],
+                        mode='markers',
+                        name=f'Best Epoch ({best_epoch})',
+                        marker=dict(color='red', size=12, symbol='star')
+                    ),
+                    row=1, col=1
+                )
             
             # 2. Loss improvement over time
-            initial_loss = convergence_info.get('initial_val_loss', val_loss.iloc[0])
-            improvement = initial_loss - val_loss if initial_loss else val_loss
-            axes[0, 1].plot(improvement.index, improvement.values, color='green', linewidth=2)
-            axes[0, 1].set_title('Cumulative Loss Improvement')
-            axes[0, 1].set_xlabel('Epoch')
-            axes[0, 1].set_ylabel('Loss Improvement')
-            axes[0, 1].grid(True, alpha=0.3)
+            initial_loss = convergence_info.get('initial_val_loss', val_loss.iloc[0] if len(val_loss) > 0 else 0)
+            if initial_loss:
+                improvement = initial_loss - val_loss
+                fig.add_trace(
+                    go.Scatter(
+                        x=improvement.index,
+                        y=improvement.values,
+                        mode='lines',
+                        name='Loss Improvement',
+                        line=dict(color='green', width=2),
+                        showlegend=False
+                    ),
+                    row=1, col=2
+                )
             
             # 3. Loss derivatives (learning speed)
             if len(val_loss) > 1:
                 loss_diff = val_loss.diff()
-                axes[1, 0].plot(loss_diff.index[1:], loss_diff.values[1:], alpha=0.7)
-                axes[1, 0].axhline(y=0, color='red', linestyle='--', alpha=0.5)
-                axes[1, 0].set_title('Validation Loss Change Rate')
-                axes[1, 0].set_xlabel('Epoch')
-                axes[1, 0].set_ylabel('Loss Δ')
-                axes[1, 0].grid(True, alpha=0.3)
+                fig.add_trace(
+                    go.Scatter(
+                        x=loss_diff.index[1:],
+                        y=loss_diff.values[1:],
+                        mode='lines',
+                        name='Loss Change Rate',
+                        line=dict(color=self.color_palette[2], width=1),
+                        opacity=0.7,
+                        showlegend=False
+                    ),
+                    row=2, col=1
+                )
+                fig.add_hline(y=0, line_dash="dash", line_color="red", row=2, col=1)
         
-        # 4. Learning rate schedule (if available)
-        lr_cols = [col for col in log_data.columns if 'lr' in col.lower() or 'learning_rate' in col.lower()]
+        # 4. Learning rate schedule or loss distribution
         if lr_cols:
             lr_data = log_data[lr_cols[0]].dropna()
-            axes[1, 1].plot(lr_data.index, lr_data.values, color='orange', linewidth=2)
-            axes[1, 1].set_title('Learning Rate Schedule')
-            axes[1, 1].set_xlabel('Epoch')
-            axes[1, 1].set_ylabel('Learning Rate')
-            axes[1, 1].set_yscale('log')
-            axes[1, 1].grid(True, alpha=0.3)
-        else:
+            fig.add_trace(
+                go.Scatter(
+                    x=lr_data.index,
+                    y=lr_data.values,
+                    mode='lines',
+                    name='Learning Rate',
+                    line=dict(color='orange', width=2),
+                    showlegend=False
+                ),
+                row=2, col=2
+            )
+            fig.update_yaxes(type="log", row=2, col=2)
+        elif val_loss_cols:
             # Plot loss distribution instead
-            if val_loss_cols:
-                axes[1, 1].hist(val_loss.values, bins=30, alpha=0.7, edgecolor='black')
-                axes[1, 1].set_title('Validation Loss Distribution')
-                axes[1, 1].set_xlabel('Loss Value')
-                axes[1, 1].set_ylabel('Frequency')
-                axes[1, 1].grid(True, alpha=0.3)
+            fig.add_trace(
+                go.Histogram(
+                    x=val_loss.values,
+                    name='Loss Distribution',
+                    nbinsx=30,
+                    marker_color=self.color_palette[3],
+                    opacity=0.7,
+                    showlegend=False
+                ),
+                row=2, col=2
+            )
         
-        plt.tight_layout()
-        plt.savefig(self.results_dir / "plots" / "convergence_analysis.png", dpi=300, bbox_inches='tight')
-        plt.show()
+        # Update layout
+        fig.update_layout(
+            height=800,
+            title_text="Interactive Model Convergence Analysis",
+            showlegend=True,
+            hovermode='x unified'
+        )
         
-        # Print convergence summary
-        print("\nConvergence Analysis Summary:")
-        print(f"Best epoch: {convergence_info.get('best_epoch', 'N/A')}")
-        print(f"Best validation loss: {convergence_info.get('best_val_loss', 'N/A'):.6f}")
-        print(f"Total improvement: {convergence_info.get('improvement_percentage', 'N/A'):.2f}%")
-        print(f"Early stopping detected: {convergence_info.get('early_stopping_detected', 'N/A')}")
-        print(f"Overfitting detected: {convergence_info.get('overfitting_detected', 'N/A')}")
+        # Update axis labels
+        fig.update_xaxes(title_text="Epoch", row=1, col=1)
+        fig.update_yaxes(title_text="Loss", row=1, col=1)
+        
+        fig.update_xaxes(title_text="Epoch", row=1, col=2)
+        fig.update_yaxes(title_text="Loss Improvement", row=1, col=2)
+        
+        fig.update_xaxes(title_text="Epoch", row=2, col=1)
+        fig.update_yaxes(title_text="Loss Δ", row=2, col=1)
+        
+        if lr_cols:
+            fig.update_xaxes(title_text="Epoch", row=2, col=2)
+            fig.update_yaxes(title_text="Learning Rate", row=2, col=2)
+        else:
+            fig.update_xaxes(title_text="Loss Value", row=2, col=2)
+            fig.update_yaxes(title_text="Frequency", row=2, col=2)
+        
+        # Save and show
+        fig.write_html(self.results_dir / "interactive" / "convergence_analysis_dashboard.html")
+        fig.show()
+        
+        # Create summary statistics table
+        summary_data = [
+            ['Best Epoch', str(convergence_info.get('best_epoch', 'N/A'))],
+            ['Best Validation Loss', f"{convergence_info.get('best_val_loss', 0):.6f}" if convergence_info.get('best_val_loss') else 'N/A'],
+            ['Total Improvement (%)', f"{convergence_info.get('improvement_percentage', 0):.2f}%" if convergence_info.get('improvement_percentage') else 'N/A'],
+            ['Early Stopping Detected', str(convergence_info.get('early_stopping_detected', 'N/A'))],
+            ['Overfitting Detected', str(convergence_info.get('overfitting_detected', 'N/A'))]
+        ]
         
         if convergence_info.get('learning_rate_analysis'):
             lr_info = convergence_info['learning_rate_analysis']
-            print(f"Learning rate reductions: {lr_info.get('lr_reductions', 'N/A')}")
-            print(f"Final learning rate: {lr_info.get('final_lr', 'N/A'):.2e}")
+            summary_data.extend([
+                ['Learning Rate Reductions', str(lr_info.get('lr_reductions', 'N/A'))],
+                ['Final Learning Rate', f"{lr_info.get('final_lr', 0):.2e}" if lr_info.get('final_lr') else 'N/A']
+            ])
+        
+        # Create summary table
+        summary_fig = go.Figure(data=[go.Table(
+            header=dict(values=['Convergence Metric', 'Value'],
+                       fill_color='lightblue',
+                       align='left'),
+            cells=dict(values=[[item[0] for item in summary_data],
+                              [item[1] for item in summary_data]],
+                      fill_color='white',
+                      align='left'))
+        ])
+        
+        summary_fig.update_layout(
+            title="Convergence Analysis Summary",
+            width=600,
+            height=300
+        )
+        summary_fig.write_html(self.results_dir / "interactive" / "convergence_summary.html")
+        summary_fig.show()
+        
+        print(f"Interactive convergence analysis dashboard saved to: {self.results_dir / 'interactive' / 'convergence_analysis_dashboard.html'}")
+        print(f"Convergence summary saved to: {self.results_dir / 'interactive' / 'convergence_summary.html'}")
+        
+        # Print convergence summary
+        print("\nConvergence Analysis Summary:")
+        for metric, value in summary_data:
+            print(f"{metric}: {value}")
     
-    def create_interactive_training_dashboard(self, log_data: pd.DataFrame):
+    def create_comprehensive_training_dashboard(self, log_data: pd.DataFrame):
         """
-        Create interactive training progress dashboard
+        Create comprehensive interactive training progress dashboard with enhanced features
         
         Args:
             log_data: DataFrame with training metrics
         """
-        print("Creating interactive training dashboard...")
+        print("Creating comprehensive interactive training dashboard...")
         
         # Identify metrics
         metric_columns = [col for col in log_data.columns if any(metric in col.lower() 
@@ -336,135 +516,197 @@ class TrainingDiagnostics:
         lr_metrics = [col for col in metric_columns if 'lr' in col.lower() or 'learning_rate' in col.lower()]
         
         # Create subplot structure
-        subplot_titles = ['Loss Curves', 'Metrics Comparison', 'Learning Rate', 'Training Statistics']
         fig = make_subplots(
             rows=2, cols=2,
-            subplot_titles=subplot_titles,
-            specs=[[{"secondary_y": True}, {"secondary_y": False}],
+            subplot_titles=('Training & Validation Loss', 'Metrics Comparison', 'Learning Rate Schedule', 'Training Statistics'),
+            specs=[[{"secondary_y": False}, {"secondary_y": False}],
                    [{"secondary_y": False}, {"secondary_y": False}]]
         )
         
-        # 1. Loss curves
+        # 1. Loss curves with enhanced styling
+        loss_train_col = None
+        loss_val_col = None
+        
         for train_col in train_metrics:
             if 'loss' in train_col.lower():
+                loss_train_col = train_col
                 train_data = log_data[train_col].dropna()
                 fig.add_trace(
-                    go.Scatter(x=train_data.index, y=train_data.values,
-                             name=f'Training Loss', line=dict(color='blue')),
+                    go.Scatter(
+                        x=train_data.index, 
+                        y=train_data.values,
+                        mode='lines',
+                        name='Training Loss', 
+                        line=dict(color=self.color_palette[0], width=2)
+                    ),
                     row=1, col=1
                 )
                 break
         
         for val_col in val_metrics:
             if 'loss' in val_col.lower():
+                loss_val_col = val_col
                 val_data = log_data[val_col].dropna()
                 fig.add_trace(
-                    go.Scatter(x=val_data.index, y=val_data.values,
-                             name=f'Validation Loss', line=dict(color='red')),
-                    row=1, col=1, secondary_y=False
+                    go.Scatter(
+                        x=val_data.index, 
+                        y=val_data.values,
+                        mode='lines',
+                        name='Validation Loss', 
+                        line=dict(color=self.color_palette[1], width=2)
+                    ),
+                    row=1, col=1
                 )
                 break
         
-        # 2. Other metrics comparison
-        colors = ['green', 'orange', 'purple', 'brown']
-        for i, metric_col in enumerate([col for col in val_metrics if 'loss' not in col.lower()][:4]):
+        # 2. Other metrics comparison with better color management
+        other_val_metrics = [col for col in val_metrics if 'loss' not in col.lower()][:4]
+        for i, metric_col in enumerate(other_val_metrics):
             metric_data = log_data[metric_col].dropna()
-            color = colors[i % len(colors)]
+            color_idx = (i + 2) % len(self.color_palette)  # Start from index 2 to avoid loss colors
             fig.add_trace(
-                go.Scatter(x=metric_data.index, y=metric_data.values,
-                         name=metric_col.replace('val_', '').upper(), 
-                         line=dict(color=color)),
+                go.Scatter(
+                    x=metric_data.index, 
+                    y=metric_data.values,
+                    mode='lines',
+                    name=metric_col.replace('val_', '').upper(), 
+                    line=dict(color=self.color_palette[color_idx], width=2)
+                ),
                 row=1, col=2
             )
         
-        # 3. Learning rate
+        # 3. Learning rate with log scale
         if lr_metrics:
             lr_data = log_data[lr_metrics[0]].dropna()
             fig.add_trace(
-                go.Scatter(x=lr_data.index, y=lr_data.values,
-                         name='Learning Rate', line=dict(color='black')),
+                go.Scatter(
+                    x=lr_data.index, 
+                    y=lr_data.values,
+                    mode='lines',
+                    name='Learning Rate', 
+                    line=dict(color='orange', width=3),
+                    showlegend=False
+                ),
                 row=2, col=1
             )
+            fig.update_yaxes(type="log", row=2, col=1)
         
-        # 4. Training statistics (box plots)
+        # 4. Enhanced training statistics with violin plots
         if val_metrics:
-            val_losses = []
-            metric_names = []
-            for col in val_metrics:
+            # Create violin plots for better distribution visualization
+            for i, col in enumerate(val_metrics[:4]):  # Limit to 4 metrics for readability
                 data = log_data[col].dropna()
                 if len(data) > 0:
-                    val_losses.extend(data.values)
-                    metric_names.extend([col.replace('val_', '')] * len(data))
-            
-            if val_losses:
-                df_stats = pd.DataFrame({'Metric': metric_names, 'Value': val_losses})
-                for metric in df_stats['Metric'].unique():
-                    metric_data = df_stats[df_stats['Metric'] == metric]['Value']
+                    color_idx = i % len(self.color_palette)
                     fig.add_trace(
-                        go.Box(y=metric_data, name=metric, boxpoints='outliers'),
+                        go.Violin(
+                            y=data.values,
+                            name=col.replace('val_', ''),
+                            box_visible=True,
+                            line_color=self.color_palette[color_idx],
+                            fillcolor=self._hex_to_rgba(self.color_palette[color_idx], 0.3),
+                            opacity=0.6,
+                            showlegend=False
+                        ),
                         row=2, col=2
                     )
         
-        # Update layout
+        # Update layout with enhanced styling
         fig.update_layout(
             height=800,
-            title_text="Interactive Training Progress Dashboard",
-            showlegend=True
+            title_text=f"Comprehensive Training Progress Dashboard ({len(log_data)} epochs)",
+            showlegend=True,
+            hovermode='x unified',
+            font=dict(size=12)
         )
         
-        # Update axes
-        fig.update_xaxes(title_text="Epoch", row=1, col=1)
-        fig.update_xaxes(title_text="Epoch", row=1, col=2)
-        fig.update_xaxes(title_text="Epoch", row=2, col=1)
+        # Update axes with better styling
+        fig.update_xaxes(title_text="Epoch", row=1, col=1, showgrid=True, gridwidth=1, gridcolor='lightgray')
+        fig.update_xaxes(title_text="Epoch", row=1, col=2, showgrid=True, gridwidth=1, gridcolor='lightgray')
+        fig.update_xaxes(title_text="Epoch", row=2, col=1, showgrid=True, gridwidth=1, gridcolor='lightgray')
+        fig.update_xaxes(title_text="Metrics", row=2, col=2)
         
-        fig.update_yaxes(title_text="Loss", row=1, col=1)
-        fig.update_yaxes(title_text="Metric Value", row=1, col=2)
-        fig.update_yaxes(title_text="Learning Rate", type="log", row=2, col=1)
-        fig.update_yaxes(title_text="Value", row=2, col=2)
+        fig.update_yaxes(title_text="Loss", row=1, col=1, showgrid=True, gridwidth=1, gridcolor='lightgray')
+        fig.update_yaxes(title_text="Metric Value", row=1, col=2, showgrid=True, gridwidth=1, gridcolor='lightgray')
+        fig.update_yaxes(title_text="Learning Rate", row=2, col=1, showgrid=True, gridwidth=1, gridcolor='lightgray')
+        fig.update_yaxes(title_text="Value Distribution", row=2, col=2)
         
         # Save and show
-        fig.write_html(self.results_dir / "interactive" / "training_dashboard.html")
+        fig.write_html(self.results_dir / "interactive" / "comprehensive_training_dashboard.html")
         fig.show()
         
-        print(f"Interactive training dashboard saved to: {self.results_dir / 'interactive' / 'training_dashboard.html'}")
+        print(f"Comprehensive training dashboard saved to: {self.results_dir / 'interactive' / 'comprehensive_training_dashboard.html'}")
+        print(f"Dashboard shows training progress over {len(log_data)} epochs with {len(metric_columns)} metrics tracked")
     
-    def run_training_analysis(self, log_path: str):
+    def run_complete_training_analysis(self, log_path: str):
         """
-        Run complete training analysis
+        Run complete interactive training analysis with performance optimization
         
         Args:
             log_path: Path to training log file or directory
         """
-        print("Starting comprehensive training analysis...")
-        print("=" * 60)
+        print("Starting comprehensive interactive training analysis...")
+        print("=" * 80)
         
         # Load training logs
         log_data = self.load_training_logs(log_path)
         print(f"Loaded training logs with {len(log_data)} records")
         print(f"Available columns: {list(log_data.columns)}")
         
-        # Run analysis
-        self.plot_training_curves(log_data)
-        convergence_info = self.analyze_convergence(log_data)
-        self.plot_convergence_analysis(log_data, convergence_info)
-        self.create_interactive_training_dashboard(log_data)
+        # Identify available metrics
+        metric_columns = [col for col in log_data.columns if any(metric in col.lower() 
+                         for metric in ['loss', 'mae', 'rmse', 'mse', 'lr', 'learning_rate'])]
+        train_metrics = [col for col in metric_columns if 'train' in col.lower()]
+        val_metrics = [col for col in metric_columns if 'val' in col.lower()]
         
-        print("\n" + "=" * 60)
-        print(f"Training analysis complete! Results saved to: {self.results_dir}")
+        print(f"Found {len(train_metrics)} training metrics and {len(val_metrics)} validation metrics")
+        
+        # Run comprehensive analysis
+        print("\n📈 Creating Training Curves Dashboard...")
+        self.create_training_curves_dashboard(log_data)
+        
+        print("\n🎯 Analyzing Model Convergence...")
+        convergence_info = self.analyze_convergence(log_data)
+        self.create_convergence_analysis_dashboard(log_data, convergence_info)
+        
+        print("\n🖥️ Creating Comprehensive Training Dashboard...")
+        self.create_comprehensive_training_dashboard(log_data)
+        
+        print("\n" + "=" * 80)
+        print("🎉 INTERACTIVE TRAINING ANALYSIS COMPLETE!")
+        print("=" * 80)
+        print(f"📁 Results saved to: {self.results_dir.absolute()}")
+        print("\n🌐 Generated Interactive Dashboards:")
+        print("   - interactive/training_curves_dashboard.html (Individual metric progress)")
+        print("   - interactive/convergence_analysis_dashboard.html (Convergence patterns)")
+        print("   - interactive/comprehensive_training_dashboard.html (Complete overview)")
+        print("   - interactive/convergence_summary.html (Convergence statistics)")
+        print("\n📖 Analysis Features:")
+        print(f"   - {len(log_data)} training epochs analyzed")
+        print(f"   - {len(train_metrics)} training metrics tracked")
+        print(f"   - {len(val_metrics)} validation metrics tracked")
+        print(f"   - Early stopping detection: {convergence_info.get('early_stopping_detected', 'N/A')}")
+        print(f"   - Overfitting detection: {convergence_info.get('overfitting_detected', 'N/A')}")
+        print("\n🚀 How to use:")
+        print("   1. Open HTML files in your web browser")
+        print("   2. Hover over plots for detailed metrics")
+        print("   3. Use zoom and pan for detailed inspection")
+        print("   4. Check convergence summary for training insights")
+        print("=" * 80)
         
         return convergence_info
 
 
 def analyze_training_progress(log_path: str, results_dir: str = "./analysis_results"):
     """
-    Convenience function to analyze training progress
+    Convenience function to analyze training progress with interactive dashboards
     
     Args:
         log_path: Path to training log file or directory
         results_dir: Directory to save results
     """
     diagnostics = TrainingDiagnostics(results_dir)
-    return diagnostics.run_training_analysis(log_path)
+    return diagnostics.run_complete_training_analysis(log_path)
 
 
 if __name__ == "__main__":
