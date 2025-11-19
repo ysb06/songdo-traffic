@@ -51,7 +51,7 @@ class SimpleTrafficDataModule(L.LightningDataModule):
         self.num_workers = num_workers
 
         self.scale_strictly = scale_strictly
-        self.scaler = MinMaxScaler(feature_range=(0, 1))
+        self._scaler = None
 
         self.shuffle_training = shuffle_training
         self.collate_fn = collate_fn
@@ -75,7 +75,10 @@ class SimpleTrafficDataModule(L.LightningDataModule):
 
     def _get_normal_scaler_ref(self, ref_df: pd.DataFrame, end_datetime: str):
         scaling_target: pd.DataFrame = ref_df.loc[:end_datetime]
-        return scaling_target.to_numpy().reshape(-1, 1)
+        # NaN 값을 제거하여 스케일러가 올바르게 피팅되도록 함
+        ref_data = scaling_target.to_numpy().reshape(-1, 1)
+        ref_data = ref_data[~np.isnan(ref_data).any(axis=1)]
+        return ref_data
 
     def _create_sensor_datasets(
         self, df: pd.DataFrame, allow_nan: bool
@@ -153,13 +156,14 @@ class SimpleTrafficDataModule(L.LightningDataModule):
             ref_data = self._get_normal_scaler_ref(
                 training_df, self.training_end_datetime
             )
-        self.scaler.fit(ref_data)
+        self._scaler = MinMaxScaler(feature_range=(0, 1))
+        self._scaler.fit(ref_data)
 
         # Apply scaler to datasets
         for dataset in (
             training_sensor_datasets + validation_sensor_datasets + test_sensor_datasets
         ):
-            dataset.apply_scaler(self.scaler)
+            dataset.apply_scaler(self._scaler)
 
     def train_dataloader(self) -> DataLoader:
         return DataLoader(
@@ -188,6 +192,37 @@ class SimpleTrafficDataModule(L.LightningDataModule):
             collate_fn=self.collate_fn,
         )
 
+    @property
+    def scaler(self):
+        """스케일러를 반환합니다. None인 경우 자동으로 생성합니다."""
+        if self._scaler is None:
+            logger.info("Scaler not found. Creating scaler from training data...")
+            self._create_scaler()
+        return self._scaler
+    
+    def _create_scaler(self) -> None:
+        """스케일러가 None인 경우 훈련 데이터로부터 스케일러를 생성합니다."""
+        # 데이터 로드 및 분할
+        raw = get_raw(self.dataset_path)
+        raw_df = raw.data
+        training_df, _, _ = self._split_df(raw_df)
+        
+        # 대상 센서 필터링
+        if self.training_target_sensors is not None:
+            training_df = training_df.loc[:, self.training_target_sensors]
+        
+        # 스케일러 준비
+        if self.scale_strictly:
+            # 엄격한 스케일링을 위해 임시 데이터셋 생성
+            temp_datasets = self._create_sensor_datasets(training_df, allow_nan=False)
+            temp_concat_dataset = ConcatDataset(temp_datasets)
+            ref_data = self._get_strict_scaler_ref(temp_concat_dataset)
+        else:
+            ref_data = self._get_normal_scaler_ref(training_df, self.training_end_datetime)
+        
+        self._scaler = MinMaxScaler(feature_range=(0, 1))
+        self._scaler.fit(ref_data)
+
 
 class MultiSensorTrafficDataModule(L.LightningDataModule):
     """TrafficMultiSensorDataset을 사용하는 개선된 Lightning DataModule.
@@ -203,15 +238,15 @@ class MultiSensorTrafficDataModule(L.LightningDataModule):
         test_period: Tuple[str, str] = ("2024-10-01 00:00:00", "2024-10-31 23:59:59"),
         seq_length: int = 24,
         batch_size: int = 64,
-        num_workers: int = 1,
+        num_workers: int = 0,
         shuffle_training: bool = True,
         collate_fn: Callable[[MultiSensorCollateFnInput], Tuple] = collate_multi_sensor,
         target_sensors: Optional[List[str]] = None,
-        scale_method: Literal["normal", "strict"] = "normal",
+        scale_method: Optional[Literal["normal", "strict", "none"]] = "normal",
     ):
         """
         Args:
-            dataset_path: 데이터셋 파일 경로
+            dataset_path: 데이터셋 파일 경로 (.h5)
             training_period: 훈련 데이터 기간 (시작, 끝)
             validation_period: 검증 데이터 기간 (시작, 끝)
             test_period: 테스트 데이터 기간 (시작, 끝)
@@ -221,7 +256,10 @@ class MultiSensorTrafficDataModule(L.LightningDataModule):
             shuffle_training: 훈련 데이터 셔플 여부
             collate_fn: 배치 처리 함수
             target_sensors: 대상 센서 목록 (None이면 모든 센서 사용)
-            scale_method: 스케일링 방법 ("normal" 또는 "strict")
+            scale_method: 스케일링 방법 ("normal", "strict", "none" 또는 None)
+                - "normal": 전체 훈련 기간 데이터로 스케일링
+                - "strict": 실제 사용되는 데이터로만 스케일링
+                - "none" 또는 None: 스케일링 적용 안함
         """
         super().__init__()
         self.dataset_path = dataset_path
@@ -237,13 +275,26 @@ class MultiSensorTrafficDataModule(L.LightningDataModule):
         self.target_sensors = target_sensors
         self.scale_method = scale_method
         
-        self.scaler = MinMaxScaler(feature_range=(0, 1))
+        self._scaler = None
         
         # 데이터셋 저장
         self.train_dataset: Optional[TrafficMultiSensorDataset] = None
         self.val_dataset: Optional[TrafficMultiSensorDataset] = None
         self.test_dataset: Optional[TrafficMultiSensorDataset] = None
-        
+
+    @property
+    def scaler(self):
+        # 스케일링 적용하지 않는 경우
+        if self.scale_method is None or self.scale_method == "none":
+            return None
+            
+        if self._scaler is None:
+            logger.info("Scaler not found. Creating scaler from training data...")
+            train_df, _, _ = self._load_and_split_data()
+            self._prepare_scaler(train_df)
+
+        return self._scaler
+
     def _load_and_split_data(self) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """데이터 로드 및 기간별 분할."""
         logger.info(f"Loading data from {self.dataset_path}")
@@ -266,18 +317,28 @@ class MultiSensorTrafficDataModule(L.LightningDataModule):
     
     def _prepare_scaler(self, train_df: pd.DataFrame) -> None:
         """스케일러 준비 및 피팅."""
-        if self.scale_method == "strict":
+        # 스케일링 적용하지 않는 경우
+        if self.scale_method is None or self.scale_method == "none":
+            logger.info("Skipping scaler preparation (scale_method is None or 'none')")
+            self._scaler = None
+            return
+            
+        elif self.scale_method == "strict":
             # 훈련 데이터셋에서 실제 사용되는 데이터로만 스케일링
             temp_dataset = TrafficMultiSensorDataset(
                 train_df, seq_length=self.seq_length, allow_nan=False
             )
             ref_data = self._get_strict_scaler_data(temp_dataset)
         else:
-            # 전체 훈련 기간 데이터로 스케일링
+            # 전체 훈련 기간 데이터로 스케일링 (NaN 값 제외)
+            # NaN 값을 제거하여 스케일러가 올바르게 피팅되도록 함
             ref_data = train_df.to_numpy().reshape(-1, 1)
+            # NaN 값이 있는 행을 제거
+            ref_data = ref_data[~np.isnan(ref_data).any(axis=1)]
         
         logger.info(f"Fitting scaler with {len(ref_data)} data points using {self.scale_method} method")
-        self.scaler.fit(ref_data)
+        self._scaler = MinMaxScaler(feature_range=(0, 1))
+        self._scaler.fit(ref_data)
     
     def _get_strict_scaler_data(self, dataset: TrafficMultiSensorDataset) -> np.ndarray:
         """Strict 방법으로 스케일러 데이터 추출."""
@@ -290,11 +351,16 @@ class MultiSensorTrafficDataModule(L.LightningDataModule):
     
     def _apply_scaling(self, *datasets: TrafficMultiSensorDataset) -> None:
         """데이터셋들에 스케일링 적용."""
+        # 스케일링 적용하지 않는 경우
+        if self.scale_method is None or self.scale_method == "none":
+            logger.warning("Skipping scaling application (scale_method is None or 'none')")
+            return
+            
         logger.info("Applying scaling to datasets")
         for dataset in datasets:
             for sensor_name in dataset.sensor_names:
                 sensor_dataset = dataset.sensor_datasets[sensor_name]
-                sensor_dataset.apply_scaler(self.scaler)
+                sensor_dataset.apply_scaler(self._scaler)
     
     def setup(self, stage: Optional[Literal["fit", "validate", "test", "predict"]] = None):
         """데이터 준비 및 설정."""
@@ -324,31 +390,57 @@ class MultiSensorTrafficDataModule(L.LightningDataModule):
     
     def train_dataloader(self) -> DataLoader:
         """훈련용 DataLoader 반환."""
-        return DataLoader(
-            self.train_dataset,
-            batch_size=self.batch_size,
-            shuffle=self.shuffle_training,
-            num_workers=self.num_workers,
-            collate_fn=self.collate_fn,
-        )
+        if self.num_workers > 0:
+            return DataLoader(
+                self.train_dataset,
+                batch_size=self.batch_size,
+                shuffle=self.shuffle_training,
+                num_workers=self.num_workers,
+                persistent_workers=True,
+                collate_fn=self.collate_fn,
+            )
+        else:
+            return DataLoader(
+                self.train_dataset,
+                batch_size=self.batch_size,
+                shuffle=self.shuffle_training,
+                collate_fn=self.collate_fn,
+            )
     
     def val_dataloader(self) -> DataLoader:
         """검증용 DataLoader 반환."""
-        return DataLoader(
-            self.val_dataset,
-            batch_size=self.batch_size,
-            shuffle=False,
-            num_workers=self.num_workers,
-            collate_fn=self.collate_fn,
-        )
+        if self.num_workers > 0:
+            return DataLoader(
+                self.val_dataset,
+                batch_size=self.batch_size,
+                shuffle=False,
+                num_workers=self.num_workers,
+                persistent_workers=True,
+                collate_fn=self.collate_fn,
+            )
+        else:
+            return DataLoader(
+                self.val_dataset,
+                batch_size=self.batch_size,
+                shuffle=False,
+                collate_fn=self.collate_fn,
+            )
     
     def test_dataloader(self) -> DataLoader:
         """테스트용 DataLoader 반환."""
-        return DataLoader(
-            self.test_dataset,
-            batch_size=self.batch_size,
-            shuffle=False,
-            num_workers=self.num_workers,
-            collate_fn=self.collate_fn,
-        )
-
+        if self.num_workers > 0:
+            return DataLoader(
+                self.test_dataset,
+                batch_size=self.batch_size,
+                shuffle=False,
+                num_workers=self.num_workers,
+                persistent_workers=True,
+                collate_fn=self.collate_fn,
+            )
+        else:
+            return DataLoader(
+                self.test_dataset,
+                batch_size=self.batch_size,
+                shuffle=False,
+                collate_fn=self.collate_fn,
+            )

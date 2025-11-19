@@ -51,11 +51,13 @@ class TrafficCoreDataset(Dataset):
         return len(self.cursors)
 
     def __getitem__(self, index: int) -> Tuple[np.ndarray, np.ndarray, List[int], int]:
-        x = self.scaled_data[index : index + self.seq_length]
-        y = self.scaled_data[index + self.seq_length]
+        # cursors에서 실제 데이터 인덱스를 가져옴
+        cursor = self.cursors[index]
+        x = self.scaled_data[cursor : cursor + self.seq_length]
+        y = self.scaled_data[cursor + self.seq_length]
 
-        x_idxs = list(range(index, index + self.seq_length))
-        y_idx = index + self.seq_length
+        x_idxs = list(range(cursor, cursor + self.seq_length))
+        y_idx = cursor + self.seq_length
 
         return x, y, x_idxs, y_idx
 

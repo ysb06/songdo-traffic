@@ -21,7 +21,7 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error
 from scipy import stats
 
 from metr.datasets.rnn.datamodule import SimpleTrafficDataModule
-from ..models.rnn import LSTMLightningModule
+from ..models.rnn.module import LSTMLightningModule
 
 
 class RNNPredictionAnalyzer:

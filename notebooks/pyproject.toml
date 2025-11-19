@@ -5,7 +5,7 @@ description = "Default template for PDM package"
 authors = [
     {name = "Seungbin Yim", email = "ysb06@hotmail.com"},
 ]
-dependencies = ["ipykernel>=6.30.1", "matplotlib>=3.10.5", "geopandas>=1.1.1", "folium>=0.20.0", "mapclassify>=2.10.0"]
+dependencies = ["ipykernel>=6.30.1", "matplotlib>=3.10.5", "geopandas>=1.1.1", "folium>=0.20.0", "mapclassify>=2.10.0", "plotly>=6.3.0", "nbformat>=5.10.4"]
 requires-python = "==3.11.*"
 readme = "README.md"
 license = {text = "MIT"}

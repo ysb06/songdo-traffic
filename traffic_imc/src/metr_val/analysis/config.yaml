@@ -1,0 +1,32 @@
+# Traffic Analysis Configuration
+analysis:
+  # Data settings
+  dataset_path: "./data/selected_small_v1/metr-imc.h5"
+  
+  # Model training settings
+  batch_size: 128
+  num_workers: 9
+  scale_method: null
+  shuffle_training: false
+  
+  # Output settings
+  output_base_dir: "./output/analysis/model/rnn"
+  save_predictions: true
+  
+  # Visualization settings
+  plotly:
+    include_plotlyjs: "cdn"
+    display_mode_bar: true
+    responsive: true
+    
+# Dataset configurations
+datasets:
+  training:
+    name: "training"
+    description: "Training dataset analysis"
+  validation:
+    name: "validation" 
+    description: "Validation dataset analysis"
+  test:
+    name: "test"
+    description: "Test dataset analysis"

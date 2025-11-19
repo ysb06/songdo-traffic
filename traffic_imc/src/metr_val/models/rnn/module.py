@@ -5,7 +5,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 from sklearn.metrics import mean_absolute_error, mean_squared_error
-from sklearn.preprocessing import MinMaxScaler
 from collections import defaultdict
 import pandas as pd
 
@@ -27,7 +26,6 @@ class LSTMLightningModule(L.LightningModule):
         dropout_rate: float = 0.2,
         scheduler_factor: float = 0.5,
         scheduler_patience: int = 10,
-        scaler: Optional[MinMaxScaler] = None,
     ):
         super().__init__()
         self.save_hyperparameters()
@@ -47,9 +45,6 @@ class LSTMLightningModule(L.LightningModule):
         self.learning_rate = learning_rate
         self.scheduler_factor = scheduler_factor
         self.scheduler_patience = scheduler_patience
-
-        # Scaler for inverse transformation
-        self.scaler = scaler
 
         # Metrics storage
         self.validation_outputs = []
@@ -161,19 +156,6 @@ class LSTMLightningModule(L.LightningModule):
         self.log("val_mae", mae_scaled)
         self.log("val_rmse", rmse_scaled)
 
-        # Calculate metrics on original scale if scaler is available
-        if self.scaler is not None:
-            # Inverse transform to original scale
-            y_true_orig = self.scaler.inverse_transform(y_true.reshape(-1, 1)).flatten()
-            y_pred_orig = self.scaler.inverse_transform(y_pred.reshape(-1, 1)).flatten()
-
-            # Calculate original scale metrics
-            mae_orig = mean_absolute_error(y_true_orig, y_pred_orig)
-            rmse_orig = np.sqrt(mean_squared_error(y_true_orig, y_pred_orig))
-
-            self.log("val_mae_original", mae_orig, prog_bar=True)
-            self.log("val_rmse_original", rmse_orig)
-
         # Clear outputs for next epoch
         self.validation_outputs.clear()
 
@@ -203,39 +185,6 @@ class LSTMLightningModule(L.LightningModule):
         print(f"RMSE: {rmse_scaled:.4f}")
         print(f"MAPE: {mape_scaled:.4f}%")
 
-        # Calculate metrics on original scale if scaler is available
-        if self.scaler is not None:
-            # Inverse transform to original scale
-            y_true_orig = self.scaler.inverse_transform(y_true.reshape(-1, 1)).flatten()
-            y_pred_orig = self.scaler.inverse_transform(y_pred.reshape(-1, 1)).flatten()
-
-            # Calculate original scale metrics
-            mae_orig = mean_absolute_error(y_true_orig, y_pred_orig)
-            rmse_orig = np.sqrt(mean_squared_error(y_true_orig, y_pred_orig))
-            # Avoid division by zero in MAPE calculation
-            non_zero_mask = y_true_orig != 0
-            if np.any(non_zero_mask):
-                mape_orig = (
-                    np.mean(
-                        np.abs(
-                            (y_true_orig[non_zero_mask] - y_pred_orig[non_zero_mask])
-                            / y_true_orig[non_zero_mask]
-                        )
-                    )
-                    * 100
-                )
-            else:
-                mape_orig = float("inf")
-
-            self.log("test_mae_original", mae_orig)
-            self.log("test_rmse_original", rmse_orig)
-            self.log("test_mape_original", mape_orig)
-
-            print(f"\nTest Results (Original Scale):")
-            print(f"MAE: {mae_orig:.4f}")
-            print(f"RMSE: {rmse_orig:.4f}")
-            print(f"MAPE: {mape_orig:.4f}%")
-
         # Clear outputs
         self.test_outputs.clear()
 
@@ -257,7 +206,6 @@ class MultiSensorLSTMLightningModule(LSTMLightningModule):
         dropout_rate: float = 0.2,
         scheduler_factor: float = 0.5,
         scheduler_patience: int = 10,
-        scaler: Optional[MinMaxScaler] = None,
         track_sensor_metrics: bool = True,
     ):
         """
@@ -274,7 +222,6 @@ class MultiSensorLSTMLightningModule(LSTMLightningModule):
             dropout_rate=dropout_rate,
             scheduler_factor=scheduler_factor,
             scheduler_patience=scheduler_patience,
-            scaler=scaler,
         )
         
         self.track_sensor_metrics = track_sensor_metrics

@@ -12,7 +12,7 @@ from .models.rnn.module import LSTMLightningModule
 
 def main():
     rnn_data = MultiSensorTrafficDataModule("./data/selected_small_v1/metr-imc.h5")
-    rnn_model = LSTMLightningModule(scaler=rnn_data.scaler)
+    rnn_model = LSTMLightningModule()
 
     output_dir = "./output/rnn"
     wandb_logger = WandbLogger(project="Traffic-IMC", log_model="all")

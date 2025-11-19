@@ -16,9 +16,6 @@
 			"module": "metr_val.analysis",
 			"console": "integratedTerminal",
 			"justMyCode": false,
-			"args": [
-				"--model_path", "./output/rnn/best-epoch=14-val_loss=0.00.ckpt",
-			]
 		}
 
 	]
