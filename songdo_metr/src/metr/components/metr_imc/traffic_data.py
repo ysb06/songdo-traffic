@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 import logging
 import os
-from typing import List, Optional, Set, Union
+from typing import List, Optional, Set, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -72,16 +72,15 @@ class TrafficData:
         freq: Optional[str] = "h",
         path: Optional[str] = None,
     ) -> None:
-        self._raw = raw
-        self._raw.sort_index(inplace=True)
+        raw.sort_index(inplace=True)
         if dtype is not None:
-            self._raw = self._as_type(self._raw, dtype)
+            raw = self._as_type(raw, dtype)
         if freq is None:
-            freq = pd.infer_freq(self._raw.index)
+            freq = pd.infer_freq(raw.index)
             logger.info(f"Inferred frequency: {freq}")
-        self._raw = self._raw.asfreq(freq)
-        self._verify_data()
-        self.reset_data()
+        raw = raw.asfreq(freq)
+        self._verify_data(raw)
+        self.data = raw
 
         self.path = path
 
@@ -93,40 +92,23 @@ class TrafficData:
         else:
             return data.astype(dtype)
 
-    def _verify_data(self) -> None:
-        if not self._raw.index.is_monotonic_increasing:
+    def _verify_data(self, raw: pd.DataFrame) -> None:
+        if not raw.index.is_monotonic_increasing:
             raise ValueError("Data not sorted by time")
+    
+    def split(self, split_date: pd.Timestamp) -> Tuple["TrafficData", "TrafficData"]:
+        """Split the data into two TrafficData instances at the specified date.
 
-    @property
-    def selected_sensors(self) -> list[str]:
+        Args:
+            split_date: The date to split the data on.
+
+        Returns:
+            A tuple containing two TrafficData instances: (data_before_split, data_after_split)
         """
-        Returns the list of currently selected sensor IDs.
-        """
-        return self.data.columns.to_list()
-
-    def select_sensors(self, sensor_ids: list[str]) -> None:
-        """
-        Selects sensors from the raw data based on the provided sensor IDs.
-        Updates the data and sensor filter accordingly.
-        """
-        new_sensor_ids = self._raw.columns.intersection(sensor_ids)
-        missing_sensors = set(sensor_ids) - set(new_sensor_ids)
-
-        if len(new_sensor_ids) <= 5:
-            logger.info(f"Selected sensors: {new_sensor_ids.tolist()}")
-        else:
-            logger.info(f"Selected {len(new_sensor_ids)} sensors.")
-
-        if missing_sensors:
-            if len(missing_sensors) <= 5:
-                logger.warning(f"Requested sensors not found: {missing_sensors}")
-            else:
-                logger.warning(f"{len(missing_sensors)} requested sensors not found.")
-
-        self.data = self._raw[new_sensor_ids].copy()
-
-    def reset_data(self) -> None:
-        self.data = self._raw.copy()
+        data_before = self.data[self.data.index < split_date]
+        data_after = self.data[self.data.index >= split_date]
+        
+        return TrafficData(data_before), TrafficData(data_after)
 
     def to_hdf(self, filepath: str, key: str = "data") -> None:
         logger.info(f"Saving data to {filepath}...")
