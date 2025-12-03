@@ -5,7 +5,7 @@ from typing import Optional, Tuple
 import numpy as np
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 from argparse import Namespace
-from .model import STGCNGraphConv
+from .model import BaseSTGCN, STGCNGraphConv, STGCNChebGraphConv
 
 
 class STGCNLightningModule(L.LightningModule):
@@ -15,24 +15,10 @@ class STGCNLightningModule(L.LightningModule):
 
     def __init__(
         self,
-        n_vertex: int,
         gso: torch.Tensor,
-        input_size: int = 1,
-        hidden_size: int = 64,
-        num_layers: int = 2,
-        output_size: int = 1,
         learning_rate: float = 0.001,
-        dropout_rate: float = 0.5,
         scheduler_factor: float = 0.95,
         scheduler_patience: int = 10,
-        n_his: int = 12,
-        n_pred: int = 3,
-        Kt: int = 3,
-        stblock_num: int = 2,
-        Ks: int = 3,
-        act_func: str = "glu",
-        graph_conv_type: str = "graph_conv",
-        enable_bias: bool = True,
     ):
         """
         Args:
@@ -58,36 +44,19 @@ class STGCNLightningModule(L.LightningModule):
         super().__init__()
         self.save_hyperparameters(ignore=["gso"])
 
-        # Calculate Ko (output temporal dimension)
-        Ko = n_his - (Kt - 1) * 2 * stblock_num
-
-        # Build blocks configuration
-        # blocks: settings of channel size in st_conv_blocks and output layer,
-        # using the bottleneck design in st_conv_blocks
-        blocks = []
-        blocks.append([1])
-        for l in range(stblock_num):
-            blocks.append([64, 16, 64])
-        if Ko == 0:
-            blocks.append([128])
-        elif Ko > 0:
-            blocks.append([128, 128])
-        blocks.append([1])
-
-        # Create args namespace for STGCN model
-        args = Namespace(
-            n_his=n_his,
-            Kt=Kt,
-            Ks=Ks,
-            act_func=act_func,
-            graph_conv_type=graph_conv_type,
-            gso=gso,
-            enable_bias=enable_bias,
-            droprate=dropout_rate,
-        )
-
         # Initialize the STGCN model
-        self.model = STGCNGraphConv(args, blocks, n_vertex)
+        self.model = BaseSTGCN(
+            n_vertex=gso.size(0),
+            gso=gso,
+            dropout_rate=0.5,
+            n_his=12,
+            Kt=3,
+            stblock_num=2,
+            Ks=3,
+            act_func="glu",
+            graph_conv_type="graph_conv",
+            enable_bias=True,
+        )
 
         # Loss function declaration
         self.criterion = nn.MSELoss()
@@ -96,9 +65,6 @@ class STGCNLightningModule(L.LightningModule):
         self.learning_rate = learning_rate
         self.scheduler_factor = scheduler_factor
         self.scheduler_patience = scheduler_patience
-
-        # Store additional parameters
-        self.n_pred = n_pred
 
         # Metrics storage
         self.validation_outputs = []

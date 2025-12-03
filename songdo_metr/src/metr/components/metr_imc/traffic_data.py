@@ -96,6 +96,23 @@ class TrafficData:
         if not raw.index.is_monotonic_increasing:
             raise ValueError("Data not sorted by time")
     
+    def select_sensors(self, sensor_ids: List[str]) -> None:
+        """Select sensors by their IDs.
+
+        Args:
+            sensor_ids: List of sensor IDs to select.
+        """
+        available_sensor_ids = set(self.data.columns)
+        selected_sensor_ids = [sid for sid in sensor_ids if sid in available_sensor_ids]
+        missing_sensor_ids = set(sensor_ids) - set(selected_sensor_ids)
+
+        if missing_sensor_ids:
+            logger.warning(
+                f"The following sensor IDs are not found in the data and will be ignored: {missing_sensor_ids}"
+            )
+
+        self.data = self.data[selected_sensor_ids]
+
     def split(self, split_date: pd.Timestamp) -> Tuple["TrafficData", "TrafficData"]:
         """Split the data into two TrafficData instances at the specified date.
 

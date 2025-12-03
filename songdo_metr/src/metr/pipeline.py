@@ -15,6 +15,7 @@ from metr.imcrts.collector import IMCRTSCollector
 from metr.nodelink.converter import NodeLink
 from metr.nodelink.downloader import download_nodelink
 from metr.utils import PathConfig
+from metr.components.metr_imc.outlier import RemovingWeirdZeroOutlierProcessor, TrafficCapacityAbsoluteOutlierProcessor
 
 
 logger = logging.getLogger(__name__)
@@ -65,6 +66,8 @@ def generate_subset_dataset(
     adj_mx_save_path = os.path.join(save_dir_path, adjacency_matrix_filename)
 
     traffic_data = TrafficData.import_from_hdf(PATH_CONF.metr_imc_path)
+    wz_outlier_processor = RemovingWeirdZeroOutlierProcessor()
+    traffic_data.data = wz_outlier_processor.process(traffic_data.data)
     traffic_data.select_sensors(target_nodelink)
     traffic_data.to_hdf(metr_imc_save_path)
 
