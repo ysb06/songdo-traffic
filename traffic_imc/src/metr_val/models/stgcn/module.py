@@ -97,9 +97,8 @@ class STGCNLightningModule(L.LightningModule):
         x, y = batch  # Simple collate function
         y_hat: torch.Tensor = self(x)
 
-        # Reshape y if needed
-        if y.dim() > 2:
-            y = y.squeeze(-1)  # Remove last dimension if it's 1
+        # Reshape model output from (batch, 1, 1, n_vertex) to (batch, n_vertex)
+        y_hat = y_hat.squeeze(1).squeeze(1)
 
         loss: torch.Tensor = self.criterion(y_hat, y)
 
@@ -114,9 +113,8 @@ class STGCNLightningModule(L.LightningModule):
         x, y = batch
         y_hat: torch.Tensor = self(x)
 
-        # Reshape y if needed
-        if y.dim() > 2:
-            y = y.squeeze(-1)
+        # Reshape model output from (batch, 1, 1, n_vertex) to (batch, n_vertex)
+        y_hat = y_hat.squeeze(1).squeeze(1)
 
         loss: torch.Tensor = self.criterion(y_hat, y)
 
@@ -140,9 +138,8 @@ class STGCNLightningModule(L.LightningModule):
         x, y = batch  # Simple collate function
         y_hat: torch.Tensor = self(x)
 
-        # Reshape y if needed
-        if y.dim() > 2:
-            y = y.squeeze(-1)
+        # Reshape model output from (batch, 1, 1, n_vertex) to (batch, n_vertex)
+        y_hat = y_hat.squeeze(1).squeeze(1)
 
         loss: torch.Tensor = self.criterion(y_hat, y)
 
@@ -190,10 +187,14 @@ class STGCNLightningModule(L.LightningModule):
         # Calculate metrics on scaled data
         mae_scaled = mean_absolute_error(y_true.flatten(), y_pred.flatten())
         rmse_scaled = np.sqrt(mean_squared_error(y_true.flatten(), y_pred.flatten()))
+        # MAPE with zero-division handling
+        y_true_flat = y_true.flatten()
+        y_pred_flat = y_pred.flatten()
+        mask = y_true_flat != 0
         mape_scaled = (
-            np.mean(np.abs((y_true.flatten() - y_pred.flatten()) / y_true.flatten()))
+            np.mean(np.abs((y_true_flat[mask] - y_pred_flat[mask]) / y_true_flat[mask]))
             * 100
-        )
+        ) if mask.any() else 0.0
 
         self.log("test_mae", mae_scaled)
         self.log("test_rmse", rmse_scaled)
