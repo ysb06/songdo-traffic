@@ -6,76 +6,94 @@ from lightning.pytorch.callbacks import (
     ModelCheckpoint,
 )
 from lightning.pytorch.loggers import WandbLogger
-from metr.components.adj_mx import AdjacencyMatrix
-from metr.datasets.stgcn.datamodule import STGCNDataModule
+from metr.datasets.mlcaformer import MLCAFormerDataModule
 
-from .models.stgcn.module import STGCNLightningModule
-from .models.stgcn.utils import prepare_gso_for_model
+from .models.mlcaformer import MLCAFormerLightningModule
 
 
 def main():
     # Configuration
-    data_dir = "./data/selected_small_v1"
-    output_dir = "./output/stgcn"
+    dataset_path = "./data/selected_small_v1/metr-imc_train.h5"
+    test_dataset_path = "./data/selected_small_v1/metr-imc_test.h5"
+    output_dir = "./output/mlcaformer"
     
     # Data parameters
-    n_his = 12  # Historical time steps
-    n_pred = 3  # Prediction time steps
+    in_steps = 12   # Input time steps
+    out_steps = 12  # Prediction time steps
+    steps_per_day = 288  # 5-minute intervals (24 * 60 / 5 = 288)
     batch_size = 32
     
     # Model parameters
-    gso_type = "sym_norm_lap"  # GSO type (recommended for STGCN)
-    graph_conv_type = "graph_conv"  # 'graph_conv' or 'cheb_graph_conv'
+    input_dim = 3  # traffic_value, time_of_day, day_of_week
+    output_dim = 1
+    input_embedding_dim = 24
+    tod_embedding_dim = 24
+    dow_embedding_dim = 24
+    nid_embedding_dim = 24
+    col_embedding_dim = 80
+    feed_forward_dim = 256
+    num_heads = 4
+    num_layers = 3
+    dropout = 0.1
     learning_rate = 0.001
     
     # Training parameters
     max_epochs = 100
     
-    # Device
+    # Device info
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     device = torch.device("mps") if torch.backends.mps.is_available() else device
     print(f"Using device: {device}")
     
-    # Load adjacency matrix and prepare GSO
-    print("Loading adjacency matrix...")
-    adj_mx_obj = AdjacencyMatrix.import_from_pickle(f"{data_dir}/adj_mx.pkl")
-    adj_mx = adj_mx_obj.adj_mx
-    n_vertex = adj_mx.shape[0]
-    print(f"Number of vertices (sensors): {n_vertex}")
-    
-    print(f"Preparing GSO (type: {gso_type}, graph_conv: {graph_conv_type})...")
-    gso_tensor = prepare_gso_for_model(
-        adj_mx=adj_mx,
-        gso_type=gso_type,
-        graph_conv_type=graph_conv_type,
-        device=device,
-        force_symmetric=True,  # Standard STGCN behavior
-    )
-    print(f"GSO tensor shape: {gso_tensor.shape}")
-    
     # Initialize data module
-    print("Creating data module...")
-    data = STGCNDataModule(
-        dataset_dir_path=data_dir,
-        n_his=n_his,
-        n_pred=n_pred,
+    print("Creating MLCAFormer data module...")
+    data = MLCAFormerDataModule(
+        dataset_path=dataset_path,
+        training_period=("2022-11-01 00:00:00", "2024-07-31 23:59:59"),
+        validation_period=("2024-08-01 00:00:00", "2024-09-30 23:59:59"),
+        test_period=("2024-10-01 00:00:00", "2024-10-31 23:59:59"),
+        in_steps=in_steps,
+        out_steps=out_steps,
+        steps_per_day=steps_per_day,
         batch_size=batch_size,
         num_workers=4,
         shuffle_training=True,
-        train_val_split=0.8,
+        scale_method="normal",
     )
     
+    # Setup data to get num_nodes
+    print("Setting up data module...")
+    data.setup()
+    num_nodes = data.num_nodes
+    scaler = data.scaler  # Get scaler for inverse transform
+    print(f"Number of nodes (sensors): {num_nodes}")
+    
     # Initialize model
-    print("Initializing STGCN model...")
-    model = STGCNLightningModule(
-        gso=gso_tensor,
+    print("Initializing MLCAFormer model...")
+    model = MLCAFormerLightningModule(
+        num_nodes=num_nodes,
+        in_steps=in_steps,
+        out_steps=out_steps,
+        steps_per_day=steps_per_day,
+        input_dim=input_dim,
+        output_dim=output_dim,
+        input_embedding_dim=input_embedding_dim,
+        tod_embedding_dim=tod_embedding_dim,
+        dow_embedding_dim=dow_embedding_dim,
+        nid_embedding_dim=nid_embedding_dim,
+        col_embedding_dim=col_embedding_dim,
+        feed_forward_dim=feed_forward_dim,
+        num_heads=num_heads,
+        num_layers=num_layers,
+        dropout=dropout,
         learning_rate=learning_rate,
-        scheduler_factor=0.95,
+        scheduler_factor=0.5,
         scheduler_patience=10,
+        scaler=scaler,  # Pass scaler for unscaled metrics
     )
     
     # Setup logger and callbacks
-    wandb_logger = WandbLogger(project="Traffic-IMC-STGCN", log_model="all")
+    wandb_logger = WandbLogger(project="Traffic-IMC-MLCAFormer", log_model="all")
     
     callbacks = [
         EarlyStopping(
@@ -86,7 +104,7 @@ def main():
         ),
         ModelCheckpoint(
             dirpath=output_dir,
-            filename="stgcn-best-{epoch:02d}-{val_loss:.4f}",
+            filename="mlcaformer-best-{epoch:02d}-{val_loss:.4f}",
             save_top_k=3,
             monitor="val_loss",
             mode="min",
@@ -109,7 +127,7 @@ def main():
     
     # Train and test
     print("\n" + "="*60)
-    print("Starting training...")
+    print("Starting MLCAFormer training...")
     print("="*60 + "\n")
     trainer.fit(model, data)
     
