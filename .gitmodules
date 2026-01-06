@@ -5,3 +5,9 @@
 [submodule "third_party/MLCAFormer-for-traffic"]
 	path = third_party/MLCAFormer-for-traffic
 	url = https://github.com/hehengyuan25/MLCAFormer-for-traffic.git
+[submodule "third_party/DCRNN"]
+	path = third_party/DCRNN
+	url = https://github.com/liyaguang/DCRNN
+[submodule "third_party/DCRNN_PyTorch"]
+	path = third_party/DCRNN_PyTorch
+	url = https://github.com/chnsh/DCRNN_PyTorch
