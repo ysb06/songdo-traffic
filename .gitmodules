@@ -11,3 +11,6 @@
 [submodule "third_party/DCRNN_PyTorch"]
 	path = third_party/DCRNN_PyTorch
 	url = https://github.com/chnsh/DCRNN_PyTorch
+[submodule "third_party/TASSGN"]
+	path = third_party/TASSGN
+	url = https://github.com/ChenMao20374042/TASSGN

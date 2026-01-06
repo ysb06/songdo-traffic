@@ -147,16 +147,27 @@ class DCGRUCell(torch.nn.Module):
         if self._max_diffusion_step == 0:
             pass
         else:
-            # Get supports on the same device as input
-            supports = self._get_supports_on_device(inputs.device)
+            device = inputs.device
+            is_mps = device.type == 'mps'
+            
+            # MPS does not support sparse matrix operations, perform on CPU
+            if is_mps:
+                supports = self._supports  # Keep on CPU
+                x0_compute = x0.cpu()
+            else:
+                supports = self._get_supports_on_device(device)
+                x0_compute = x0
+            
             for support in supports:
-                x1 = torch.sparse.mm(support, x0)
+                x1_compute = torch.sparse.mm(support, x0_compute)
+                x1 = x1_compute.to(device) if is_mps else x1_compute
                 x = self._concat(x, x1)
 
                 for k in range(2, self._max_diffusion_step + 1):
-                    x2 = 2 * torch.sparse.mm(support, x1) - x0
+                    x2_compute = 2 * torch.sparse.mm(support, x1_compute) - x0_compute
+                    x2 = x2_compute.to(device) if is_mps else x2_compute
                     x = self._concat(x, x2)
-                    x1, x0 = x2, x1
+                    x1_compute, x0_compute = x2_compute, x1_compute
 
         num_matrices = len(self._supports) * self._max_diffusion_step + 1  # Adds for x itself.
         x = torch.reshape(x, shape=[num_matrices, self._num_nodes, input_size, batch_size])
@@ -164,9 +175,15 @@ class DCGRUCell(torch.nn.Module):
         x = torch.reshape(x, shape=[batch_size * self._num_nodes, input_size * num_matrices])
 
         weights = self._gconv_params.get_weights((input_size * num_matrices, output_size))
+        # Ensure weights are on the same device as input
+        if weights.device != device:
+            weights = weights.to(device)
         x = torch.matmul(x, weights)  # (batch_size * self._num_nodes, output_size)
 
         biases = self._gconv_params.get_biases(output_size, bias_start)
+        # Ensure biases are on the same device as input
+        if biases.device != device:
+            biases = biases.to(device)
         x += biases
         # Reshape res back to 2D: (batch_size, num_node, state_dim) -> (batch_size, num_node * state_dim)
         return torch.reshape(x, [batch_size, self._num_nodes * output_size])
