@@ -1,3 +1,3 @@
-from .tassgn import main
+from .agcrn import main
 
 main()
