@@ -257,11 +257,24 @@ class PredictorLightningModule(L.LightningModule):
     def load_encoder_weights(self, encoder_state_dict: Dict[str, torch.Tensor]):
         """Load pretrained encoder weights into the Predictor's encoder.
         
+        Note: Only loads weights that are compatible between Phase 1 STIDEncoder
+        and Predictor's internal encoder. The regression_layer is excluded because
+        Phase 1 encoder has output_len=12 while Predictor's encoder has output_len=num_clusters.
+        
         Args:
             encoder_state_dict: State dict from STIDEncoder.
         """
-        self.model.encoder.load_state_dict(encoder_state_dict)
-        print("Loaded pretrained encoder weights into Predictor.")
+        # Filter out regression_layer weights (size mismatch between Phase 1 and Phase 3)
+        # Phase 1: regression_layer outputs [12] (out_steps)
+        # Phase 3: regression_layer outputs [num_clusters] (different purpose)
+        filtered_state_dict = {
+            k: v for k, v in encoder_state_dict.items()
+            if not k.startswith("regression_layer")
+        }
+        
+        # Load with strict=False to allow missing regression_layer
+        self.model.encoder.load_state_dict(filtered_state_dict, strict=False)
+        print(f"Loaded pretrained encoder weights into Predictor (excluded regression_layer).")
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass for label prediction.

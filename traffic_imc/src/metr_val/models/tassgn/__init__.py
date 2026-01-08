@@ -1,25 +1,3 @@
-"""TASSGN model components and Lightning modules."""
-
-from .encoder import STIDEncoder
-from .labeler import Labeler
-from .predictor import Predictor
-from .TAGEncoder import TAGEncoder
-from .TASSGN import TASSGN
-from .module import (
-    STIDEncoderLightningModule,
-    PredictorLightningModule,
-    TASSGNLightningModule,
-)
-
-__all__ = [
-    # Model components
-    "STIDEncoder",
-    "Labeler",
-    "Predictor",
-    "TAGEncoder",
-    "TASSGN",
-    # Lightning modules
-    "STIDEncoderLightningModule",
-    "PredictorLightningModule",
-    "TASSGNLightningModule",
-]
+"""
+TASSGN 모델 학습 모듈. 현재는 미완성 코드이므로 이 모듈은 Deprecated 상태임. 추후 완성 후 Deprecated 상태를 해제할 예정.
+"""
