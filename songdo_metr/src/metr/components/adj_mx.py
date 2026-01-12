@@ -18,6 +18,7 @@ class AdjacencyMatrix:
             data = pickle.load(f)
         return AdjacencyMatrix(*data)
 
+    @staticmethod
     def import_from_components(
         id_list: IdList, distances_imc: DistancesImc, normalized_k=0.1
     ) -> "AdjacencyMatrix":

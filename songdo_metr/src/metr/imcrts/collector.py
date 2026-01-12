@@ -20,7 +20,7 @@ class IMCRTSCollector:
         self,
         api_key: str,
         start_date: str = "20230101",
-        end_date: str = "20231231",
+        end_date: str = "20260101",
     ) -> None:
         self.params = {
             "serviceKey": api_key,
