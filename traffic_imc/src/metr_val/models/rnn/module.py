@@ -9,6 +9,7 @@ from collections import defaultdict
 import pandas as pd
 
 from .model import LSTMBaseModel
+from ...utils import set_random_seed  # 추가: 시드 고정 함수 임포트
 
 
 class LSTMLightningModule(L.LightningModule):
@@ -26,9 +27,20 @@ class LSTMLightningModule(L.LightningModule):
         dropout_rate: float = 0.2,
         scheduler_factor: float = 0.5,
         scheduler_patience: int = 10,
+        seed: Optional[int] = None,  # 수정: 기본값 None, 매번 다른 시드
+        gradient_clip_val: float = 1.0,  # 추가: 그래디언트 클리핑 값
+        scaler=None,  # 추가: 테스트 메트릭 계산을 위한 스케일러
     ):
         super().__init__()
-        self.save_hyperparameters()
+        # 랜덤 시드 고정 (재현성 확보)
+        self.seed = set_random_seed(seed)
+        self.save_hyperparameters(ignore=["scaler"])
+        
+        # Store scaler for inverse transform during test
+        self.scaler = scaler
+
+        # 그래디언트 클리핑 값 저장
+        self.gradient_clip_val = gradient_clip_val
 
         # Initialize the LSTMBase model
         self.model = LSTMBaseModel(
@@ -83,6 +95,9 @@ class LSTMLightningModule(L.LightningModule):
             y = y.squeeze(-1)  # Remove last dimension if it's 1
 
         loss: torch.Tensor = self.criterion(y_hat, y)
+
+        # 그래디언트 클리핑 적용 (폭발 방지)
+        torch.nn.utils.clip_grad_norm_(self.parameters(), self.gradient_clip_val)
 
         self.log("train_loss", loss, on_step=True, on_epoch=True)
 
@@ -160,7 +175,10 @@ class LSTMLightningModule(L.LightningModule):
         self.validation_outputs.clear()
 
     def on_test_epoch_end(self):
-        """Calculate test metrics at the end of epoch"""
+        """Calculate test metrics at the end of epoch.
+        
+        Metrics are computed on the original (unscaled) data using inverse transform.
+        """
         if len(self.test_outputs) == 0:
             return
 
@@ -168,22 +186,44 @@ class LSTMLightningModule(L.LightningModule):
         y_true = np.concatenate([x["y_true"] for x in self.test_outputs], axis=0)
         y_pred = np.concatenate([x["y_pred"] for x in self.test_outputs], axis=0)
 
-        # Calculate metrics on scaled data
-        mae_scaled = mean_absolute_error(y_true.flatten(), y_pred.flatten())
-        rmse_scaled = np.sqrt(mean_squared_error(y_true.flatten(), y_pred.flatten()))
-        mape_scaled = (
-            np.mean(np.abs((y_true.flatten() - y_pred.flatten()) / y_true.flatten()))
-            * 100
+        # Inverse transform to get original scale values
+        if self.scaler is not None:
+            # Store original shapes
+            original_shape = y_true.shape
+            
+            # Flatten, inverse transform, and reshape back
+            y_true_flat = y_true.reshape(-1, 1)
+            y_pred_flat = y_pred.reshape(-1, 1)
+            
+            y_true_unscaled = self.scaler.inverse_transform(y_true_flat).reshape(original_shape)
+            y_pred_unscaled = self.scaler.inverse_transform(y_pred_flat).reshape(original_shape)
+        else:
+            # No scaler provided, use original values
+            y_true_unscaled = y_true
+            y_pred_unscaled = y_pred
+
+        # Calculate metrics on unscaled (original) data
+        mae = mean_absolute_error(y_true_unscaled.flatten(), y_pred_unscaled.flatten())
+        rmse = np.sqrt(mean_squared_error(y_true_unscaled.flatten(), y_pred_unscaled.flatten()))
+        
+        # MAPE with zero-division handling
+        y_true_flat = y_true_unscaled.flatten()
+        y_pred_flat = y_pred_unscaled.flatten()
+        mask = y_true_flat != 0
+        mape = (
+            np.mean(np.abs((y_true_flat[mask] - y_pred_flat[mask]) / y_true_flat[mask])) * 100
+            if mask.any()
+            else 0.0
         )
 
-        self.log("test_mae", mae_scaled)
-        self.log("test_rmse", rmse_scaled)
-        self.log("test_mape", mape_scaled)
+        self.log("test_mae", mae)
+        self.log("test_rmse", rmse)
+        self.log("test_mape", float(mape))
 
-        print(f"\nTest Results (Scaled):")
-        print(f"MAE: {mae_scaled:.4f}")
-        print(f"RMSE: {rmse_scaled:.4f}")
-        print(f"MAPE: {mape_scaled:.4f}%")
+        print(f"\nTest Results (Original Scale):")
+        print(f"MAE: {mae:.4f}")
+        print(f"RMSE: {rmse:.4f}")
+        print(f"MAPE: {mape:.2f}%")
 
         # Clear outputs
         self.test_outputs.clear()
@@ -207,10 +247,16 @@ class MultiSensorLSTMLightningModule(LSTMLightningModule):
         scheduler_factor: float = 0.5,
         scheduler_patience: int = 10,
         track_sensor_metrics: bool = True,
+        seed: Optional[int] = None,  # 수정: 기본값 None, 매번 다른 시드
+        gradient_clip_val: float = 1.0,  # 추가: 그래디언트 클리핑 값
+        scaler=None,  # 추가: 테스트 메트릭 계산을 위한 스케일러
     ):
         """
         Args:
             track_sensor_metrics: 센서별 메트릭 추적 여부
+            seed: 랜덤 시드 (재현성)
+            gradient_clip_val: 그래디언트 클리핑 값
+            scaler: 테스트 메트릭 계산을 위한 스케일러 (inverse_transform용)
             기타 매개변수는 부모 클래스와 동일
         """
         super().__init__(
@@ -222,6 +268,9 @@ class MultiSensorLSTMLightningModule(LSTMLightningModule):
             dropout_rate=dropout_rate,
             scheduler_factor=scheduler_factor,
             scheduler_patience=scheduler_patience,
+            seed=seed,
+            gradient_clip_val=gradient_clip_val,
+            scaler=scaler,
         )
         
         self.track_sensor_metrics = track_sensor_metrics
@@ -244,6 +293,9 @@ class MultiSensorLSTMLightningModule(LSTMLightningModule):
             y = y.squeeze(-1)
 
         loss: torch.Tensor = self.criterion(y_hat, y)
+        
+        # 그래디언트 클리핑 적용 (폭발 방지)
+        torch.nn.utils.clip_grad_norm_(self.parameters(), self.gradient_clip_val)
         
         self.log("train_loss", loss, on_step=True, on_epoch=True)
         

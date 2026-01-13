@@ -1,7 +1,7 @@
 import logging
 
 from metr.pipeline import generate_raw_dataset, generate_subset_dataset
-import pandas as pd
+
 
 logging.basicConfig(
     format="%(asctime)s %(name)s [%(levelname)s] %(message)s",

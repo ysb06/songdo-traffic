@@ -7,15 +7,17 @@ from lightning.pytorch.callbacks import (
 from lightning.pytorch.loggers import WandbLogger
 from metr.datasets.rnn.datamodule import MultiSensorTrafficDataModule
 
-from .models.rnn.module import LSTMLightningModule
+from .models.rnn.module import MultiSensorLSTMLightningModule
 
 
-def main():
-    data = MultiSensorTrafficDataModule("./data/selected_small_v1/metr-imc.h5")
-    model = LSTMLightningModule()
+def main(dataset_path: str = "./data/selected_small_v1/metr-imc.h5"):
+    data = MultiSensorTrafficDataModule(dataset_path)
+    data.setup()  # Setup을 먼저 호출하여 scaler 생성
+    
+    model = MultiSensorLSTMLightningModule(scaler=data.scaler)
 
-    output_dir = "./output/rnn"
-    wandb_logger = WandbLogger(project="Traffic-IMC", log_model="all")
+    output_dir = "./output/lstm"
+    wandb_logger = WandbLogger(project="Traffic-IMC-LSTM", log_model="all")
 
     trainer = Trainer(
         max_epochs=100,

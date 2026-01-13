@@ -95,7 +95,7 @@ class TrafficData:
     def _verify_data(self, raw: pd.DataFrame) -> None:
         if not raw.index.is_monotonic_increasing:
             raise ValueError("Data not sorted by time")
-    
+
     def select_sensors(self, sensor_ids: List[str]) -> None:
         """Select sensors by their IDs.
 
@@ -108,8 +108,10 @@ class TrafficData:
 
         if missing_sensor_ids:
             logger.warning(
-                f"The following sensor IDs are not found in the data and will be ignored: {missing_sensor_ids}"
+                f"The {len(missing_sensor_ids)} sensor IDs are not found in the data"
             )
+            if len(missing_sensor_ids) <= 10:
+                logger.warning(f"Missing sensor IDs: {missing_sensor_ids}")
 
         self.data = self.data[selected_sensor_ids]
 
@@ -124,7 +126,7 @@ class TrafficData:
         """
         data_before = self.data[self.data.index < split_date]
         data_after = self.data[self.data.index >= split_date]
-        
+
         return TrafficData(data_before), TrafficData(data_after)
 
     def to_hdf(self, filepath: str, key: str = "data") -> None:
