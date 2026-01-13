@@ -19,6 +19,7 @@ class STGCNLightningModule(L.LightningModule):
         learning_rate: float = 0.001,
         scheduler_factor: float = 0.95,
         scheduler_patience: int = 10,
+        scaler=None,
     ):
         """
         Args:
@@ -40,9 +41,13 @@ class STGCNLightningModule(L.LightningModule):
             act_func: Activation function ('glu' or 'gtu', default: 'glu')
             graph_conv_type: Graph convolution type ('cheb_graph_conv' or 'graph_conv', default: 'graph_conv')
             enable_bias: Enable bias in layers (default: True)
+            scaler: MinMaxScaler instance for inverse transform (optional, default: None)
         """
         super().__init__()
-        self.save_hyperparameters(ignore=["gso"])
+        self.save_hyperparameters(ignore=["gso", "scaler"])
+        
+        # Store scaler for inverse transform (not saved in checkpoints)
+        self.scaler = scaler
 
         # Initialize the STGCN model
         self.model = BaseSTGCN(
@@ -89,6 +94,23 @@ class STGCNLightningModule(L.LightningModule):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.model(x)
+    
+    def _inverse_transform(self, data: np.ndarray) -> np.ndarray:
+        """Inverse transform scaled data back to original scale.
+        
+        Args:
+            data: Scaled data of shape (batch, n_vertex)
+            
+        Returns:
+            Unscaled data with the same shape
+        """
+        if self.scaler is None:
+            return data
+        
+        original_shape = data.shape
+        flat_data = data.reshape(-1, 1)
+        unscaled = self.scaler.inverse_transform(flat_data)
+        return unscaled.reshape(original_shape)
 
     def training_step(
         self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int
@@ -201,9 +223,41 @@ class STGCNLightningModule(L.LightningModule):
         self.log("test_mape", mape_scaled)
 
         print(f"\nTest Results (Scaled):")
-        print(f"MAE: {mae_scaled:.4f}")
-        print(f"RMSE: {rmse_scaled:.4f}")
-        print(f"MAPE: {mape_scaled:.4f}%")
+        print(f"  MAE:  {mae_scaled:.4f}")
+        print(f"  RMSE: {rmse_scaled:.4f}")
+        print(f"  MAPE: {mape_scaled:.4f}%")
+        
+        # Calculate unscaled metrics if scaler is provided
+        if self.scaler is not None:
+            y_true_unscaled = self._inverse_transform(y_true)
+            y_pred_unscaled = self._inverse_transform(y_pred)
+            
+            mae_unscaled = mean_absolute_error(
+                y_true_unscaled.flatten(), y_pred_unscaled.flatten()
+            )
+            rmse_unscaled = np.sqrt(mean_squared_error(
+                y_true_unscaled.flatten(), y_pred_unscaled.flatten()
+            ))
+            
+            # MAPE with zero-division handling
+            y_true_unscaled_flat = y_true_unscaled.flatten()
+            y_pred_unscaled_flat = y_pred_unscaled.flatten()
+            mask_unscaled = y_true_unscaled_flat != 0
+            mape_unscaled = (
+                np.mean(np.abs(
+                    (y_true_unscaled_flat[mask_unscaled] - y_pred_unscaled_flat[mask_unscaled])
+                    / y_true_unscaled_flat[mask_unscaled]
+                )) * 100
+            ) if mask_unscaled.any() else 0.0
+            
+            self.log("test_mae_unscaled", mae_unscaled)
+            self.log("test_rmse_unscaled", rmse_unscaled)
+            self.log("test_mape_unscaled", mape_unscaled)
+            
+            print(f"\nTest Results (Original Scale):")
+            print(f"  MAE:  {mae_unscaled:.4f}")
+            print(f"  RMSE: {rmse_unscaled:.4f}")
+            print(f"  MAPE: {mape_unscaled:.4f}%")
 
         # Clear outputs
         self.test_outputs.clear()

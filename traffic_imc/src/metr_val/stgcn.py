@@ -13,9 +13,8 @@ from .models.stgcn.module import STGCNLightningModule
 from .models.stgcn.utils import prepare_gso_for_model
 
 
-def main():
+def main(dataset_root_dir = "./data/selected_small_v1"):
     # Configuration
-    data_dir = "./data/selected_small_v1"
     output_dir = "./output/stgcn"
     
     # Data parameters
@@ -38,7 +37,7 @@ def main():
     
     # Load adjacency matrix and prepare GSO
     print("Loading adjacency matrix...")
-    adj_mx_obj = AdjacencyMatrix.import_from_pickle(f"{data_dir}/adj_mx.pkl")
+    adj_mx_obj = AdjacencyMatrix.import_from_pickle(f"{dataset_root_dir}/adj_mx.pkl")
     adj_mx = adj_mx_obj.adj_mx
     n_vertex = adj_mx.shape[0]
     print(f"Number of vertices (sensors): {n_vertex}")
@@ -56,7 +55,7 @@ def main():
     # Initialize data module
     print("Creating data module...")
     data = STGCNDataModule(
-        dataset_dir_path=data_dir,
+        dataset_dir_path=dataset_root_dir,
         n_his=n_his,
         n_pred=n_pred,
         batch_size=batch_size,
@@ -65,6 +64,12 @@ def main():
         train_val_split=0.8,
     )
     
+    # Setup data module to get scaler
+    print("Setting up data module...")
+    data.setup("fit")
+    scaler = data.scaler
+    print(f"Scaler fitted: {scaler is not None}")
+    
     # Initialize model
     print("Initializing STGCN model...")
     model = STGCNLightningModule(
@@ -72,6 +77,7 @@ def main():
         learning_rate=learning_rate,
         scheduler_factor=0.95,
         scheduler_patience=10,
+        scaler=scaler,  # Pass scaler for unscaled metrics
     )
     
     # Setup logger and callbacks

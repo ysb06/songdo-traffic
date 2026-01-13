@@ -20,8 +20,32 @@ class STGCNDataset(Dataset):
     
     def __init__(self, data: np.ndarray, n_his: int, n_pred: int):
         self.x, self.y = self._data_transform(data, n_his, n_pred)
+        self._is_scaled = False
         
         assert len(self.x) == len(self.y), "x and y must have the same length"
+    
+    def apply_scaler(self, scaler: MinMaxScaler) -> None:
+        """Apply scaling to the dataset using a fitted scaler.
+        
+        Args:
+            scaler: Fitted MinMaxScaler instance
+        """
+        if self._is_scaled:
+            return
+        
+        # Scale x: shape (num_samples, in_channels, n_his, n_vertex)
+        x_shape = self.x.shape
+        x_flat = self.x.numpy().reshape(-1, 1)
+        x_scaled = scaler.transform(x_flat)
+        self.x = torch.tensor(x_scaled.reshape(x_shape), dtype=torch.float32)
+        
+        # Scale y: shape (num_samples, n_vertex)
+        y_shape = self.y.shape
+        y_flat = self.y.numpy().reshape(-1, 1)
+        y_scaled = scaler.transform(y_flat)
+        self.y = torch.tensor(y_scaled.reshape(y_shape), dtype=torch.float32)
+        
+        self._is_scaled = True
     
     def __len__(self) -> int:
         return len(self.x)
