@@ -1,5 +1,5 @@
 # Raw data paths configuration
-root_dir: "../datasets/metr-imc/subsets/v1"
+root_dir: "../datasets/metr-imc/subsets/v2"
 
 # Core files
 dataset:

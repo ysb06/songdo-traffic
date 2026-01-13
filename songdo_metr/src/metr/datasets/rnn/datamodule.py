@@ -237,7 +237,7 @@ class MultiSensorTrafficDataModule(L.LightningDataModule):
         validation_period: Tuple[str, str] = ("2024-08-01 00:00:00", "2024-09-30 23:59:59"),
         test_period: Tuple[str, str] = ("2024-10-01 00:00:00", "2024-10-31 23:59:59"),
         seq_length: int = 24,
-        batch_size: int = 64,
+        batch_size: int = 512,
         num_workers: int = 0,
         shuffle_training: bool = True,
         collate_fn: Callable[[MultiSensorCollateFnInput], Tuple] = collate_multi_sensor,

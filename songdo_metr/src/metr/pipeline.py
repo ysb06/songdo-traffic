@@ -3,6 +3,7 @@ import os
 from typing import Optional
 
 import geopandas as gpd
+import networkx as nx
 import pandas as pd
 
 from metr.components import (
@@ -13,10 +14,6 @@ from metr.components import (
     SensorLocations,
     TrafficData,
 )
-from metr.components.metr_imc.outlier import (
-    RemovingWeirdZeroOutlierProcessor,
-    TrafficCapacityAbsoluteOutlierProcessor,
-)
 from metr.imcrts.collector import IMCRTSCollector
 from metr.nodelink.converter import NodeLink
 from metr.nodelink.downloader import download_nodelink
@@ -25,7 +22,7 @@ from metr.utils import PathConfig
 logger = logging.getLogger(__name__)
 PATH_CONF = PathConfig.from_yaml("../config.yaml")
 PATH_CONF.create_directories()
-PATH_SUBSET_CONF = PathConfig.from_yaml("../config_filtered.yaml")
+PATH_SUBSET_CONF = PathConfig.from_yaml("../config_subset.yaml")
 
 
 # Other Settings
@@ -88,8 +85,8 @@ IMCRTS_END_DATE = "20251231"
 
 def generate_raw_dataset():
     # Generating Core Files
-    # generate_nodelink_raw()
-    # generate_imcrts_raw()
+    generate_nodelink_raw()
+    generate_imcrts_raw()
     generate_metr_imc_raw()
     generate_dataset()
 
@@ -106,6 +103,7 @@ def generate_subset_dataset(
     target_nodelinks_path: Optional[str] = None,
     target_data_start: Optional[str] = None,
     target_data_end: Optional[str] = None,
+    cluster_count: Optional[int] = 1,
 ):
     """
     기존 raw 데이터셋에서 공간/시간 필터링하여 subset 데이터셋을 생성합니다.
@@ -124,9 +122,15 @@ def generate_subset_dataset(
     logger.info("Loading raw METR-IMC data...")
     traffic_data = TrafficData.import_from_hdf(PATH_CONF.metr_imc_path)
     df = traffic_data.data
+
+    adj_mx_raw = AdjacencyMatrix.import_from_pickle(PATH_CONF.adj_mx_path)
+    adj_mx = adj_mx_raw.adj_mx
+    G = nx.from_numpy_array(adj_mx)
+    g_idx_to_sensor = {value: key for key, value in adj_mx_raw.sensor_id_to_idx.items()}
     logger.info(f"Original data: {len(df)} rows, {len(df.columns)} sensors")
 
-    # 3. 공간 필터링 (shapefile에서 LINK_ID 추출 후 직접 열 선택)
+    # 3. 공간 필터링
+    # 3.1 shapefile에서 LINK_ID 추출 후 직접 열 선택
     if target_nodelinks_path:
         logger.info(f"Filtering sensors from shapefile: {target_nodelinks_path}")
         target_roads = gpd.read_file(target_nodelinks_path)
@@ -135,6 +139,52 @@ def generate_subset_dataset(
         valid_link_ids = [lid for lid in target_link_ids if lid in df.columns]
         df = df[valid_link_ids]
         logger.info(f"After spatial filtering: {len(df.columns)} sensors")
+
+    # 3.2 adjacency matrix 에서 가장 큰 연결 그래프에 속한 노드들만 선택
+    if cluster_count is not None and cluster_count > 0:
+        # 현재 df에 남아있는 센서들의 인덱스 추출
+        sensor_to_g_idx = adj_mx_raw.sensor_id_to_idx
+        current_sensor_ids = set(df.columns)
+        current_node_indices = [
+            sensor_to_g_idx[sid] for sid in current_sensor_ids if sid in sensor_to_g_idx
+        ]
+
+        # 현재 센서들로 서브그래프 생성
+        subgraph = G.subgraph(current_node_indices).copy()
+        connected_components = list(nx.connected_components(subgraph))
+
+        # 크기 순으로 정렬 (큰 것부터)
+        connected_components.sort(key=len, reverse=True)
+        logger.info(
+            f"Found {len(connected_components)} connected components, "
+            f"sizes: {[len(c) for c in connected_components[:5]]}..."
+        )
+
+        # 상위 cluster_count개의 컴포넌트만 선택
+        selected_components = connected_components[:cluster_count]
+        logger.info(
+            f"Selected top {cluster_count} component(s) with sizes: "
+            f"{[len(c) for c in selected_components]}"
+        )
+
+        # 선택된 컴포넌트의 노드 인덱스를 sensor_id로 변환
+        selected_node_indices = set()
+        for component in selected_components:
+            selected_node_indices.update(component)
+
+        selected_sensor_ids = [
+            g_idx_to_sensor[idx]
+            for idx in selected_node_indices
+            if idx in g_idx_to_sensor
+        ]
+
+        # DataFrame에서 선택된 센서들만 필터링
+        valid_sensor_ids = [sid for sid in selected_sensor_ids if sid in df.columns]
+        df = df[valid_sensor_ids]
+        logger.info(
+            f"After cluster filtering: {len(df.columns)} sensors "
+            f"from {len(selected_components)} component(s)"
+        )
 
     # 4. 시간 필터링 (DatetimeIndex 기반)
     if target_data_start or target_data_end:
@@ -174,8 +224,11 @@ def generate_subset_dataset(
         output_path=subset_path_conf.distances_shapefile_path,
     )
 
-    logger.info(f"Subset dataset generation completed: {subset_path_conf.root_dir_path}")
+    logger.info(
+        f"Subset dataset generation completed: {subset_path_conf.root_dir_path}"
+    )
 
+# ------------------------------------------------------------------------------ #
 
 def generate_metr_imc_excel(
     metr_imc_path: str = PATH_CONF.metr_imc_path,
@@ -307,7 +360,7 @@ def generate_imcrts_raw(
     logger.info("Collecting IMCRTS Data...")
     if api_key is None:
         raise ValueError("PDP_KEY 환경 변수가 설정되어 있지 않습니다.")
-    
+
     collector = IMCRTSCollector(
         api_key=api_key,
         start_date=start_date,

@@ -2,21 +2,12 @@
 	"version": "0.2.0",
 	"configurations": [
 		{
-			"name": "Run Project",
+			"name": "Run Dataset Validation Project",
 			"type": "debugpy",
 			"request": "launch",
 			"module": "metr_val",
 			"console": "integratedTerminal",
 			"justMyCode": false
-		},
-		{
-			"name": "Run Analysis and Visualization",
-			"type": "debugpy",
-			"request": "launch",
-			"module": "metr_val.analysis",
-			"console": "integratedTerminal",
-			"justMyCode": false,
 		}
-
 	]
 }
