@@ -1,6 +1,6 @@
-from .rnn import main
+from .stgcn import main
 
-SMALL_DATASET_PATH = "./data/selected_small_v1/metr-imc.h5"
-MAIN_DATASET_PATH = "../datasets/metr-imc/subsets/v2/metr-imc.h5"
+SMALL_DATASET_DIR = "./data/selected_small_v1"
+MAIN_DATASET_DIR = "../datasets/metr-imc/subsets/v2"
 
-main(MAIN_DATASET_PATH)
+main(MAIN_DATASET_DIR)
