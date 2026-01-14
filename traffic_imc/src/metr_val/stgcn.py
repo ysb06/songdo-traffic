@@ -7,7 +7,7 @@ from lightning.pytorch.callbacks import (
 )
 from lightning.pytorch.loggers import WandbLogger
 from metr.components.adj_mx import AdjacencyMatrix
-from metr.datasets.stgcn.datamodule import STGCNDataModule
+from metr.datasets.stgcn.datamodule import STGCNDataModule, STGCNDataModuleByDate
 
 from .models.stgcn.module import STGCNLightningModule
 from .models.stgcn.utils import prepare_gso_for_model
@@ -54,14 +54,18 @@ def main(dataset_root_dir = "./data/selected_small_v1"):
     
     # Initialize data module
     print("Creating data module...")
-    data = STGCNDataModule(
+    data = STGCNDataModuleByDate(
         dataset_dir_path=dataset_root_dir,
         n_his=n_his,
         n_pred=n_pred,
         batch_size=batch_size,
         num_workers=4,
         shuffle_training=True,
-        train_val_split=0.8,
+        # Using default date periods:
+        # training: 2023-01-26 ~ 2025-09-30
+        # validation: 2025-10-01 ~ 2025-11-30
+        # test: 2025-12-01 ~ 2025-12-31
+        # Adjust periods if your dataset has different date range
     )
     
     # Setup data module to get scaler
