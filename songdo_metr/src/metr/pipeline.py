@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Optional
+from typing import List, Optional
 
 import geopandas as gpd
 import networkx as nx
@@ -14,6 +14,8 @@ from metr.components import (
     SensorLocations,
     TrafficData,
 )
+from metr.components.metr_imc.outlier import OutlierProcessor
+from metr.components.metr_imc.interpolation import Interpolator
 from metr.imcrts.collector import IMCRTSCollector
 from metr.nodelink.converter import NodeLink
 from metr.nodelink.downloader import download_nodelink
@@ -98,13 +100,15 @@ def generate_raw_dataset():
     generate_metr_imc_excel()
 
 
-def generate_subset_dataset(
+def generate_subset(
     subset_path_conf: PathConfig = PATH_SUBSET_CONF,
     target_nodelinks_path: Optional[str] = None,
     target_data_start: Optional[str] = None,
     target_data_end: Optional[str] = None,
     cluster_count: Optional[int] = 1,
     missing_rate_threshold: float = 0.9,
+    outlier_processors: Optional[List[OutlierProcessor]] = None,
+    interpolation_processors: Optional[List[Interpolator]] = None,
 ):
     """
     기존 raw 데이터셋에서 공간/시간 필터링하여 subset 데이터셋을 생성합니다.
@@ -132,15 +136,21 @@ def generate_subset_dataset(
 
     # 3. 결측률 필터링
     if missing_rate_threshold < 1.0:
-        logger.info(f"Filtering sensors by missing rate threshold: {missing_rate_threshold * 100:.1f}%")
+        logger.info(
+            f"Filtering sensors by missing rate threshold: {missing_rate_threshold * 100:.1f}%"
+        )
         missing_mask = df.isna()
         sensor_missing_counts = missing_mask.sum()
         sensor_missing_rates = sensor_missing_counts / len(df)
-        
+
         # missing_rate_threshold 미만의 결측률을 가진 센서만 선택
-        filtered_sensors = sensor_missing_rates[sensor_missing_rates < missing_rate_threshold].index.tolist()
+        filtered_sensors = sensor_missing_rates[
+            sensor_missing_rates < missing_rate_threshold
+        ].index.tolist()
         df = df[filtered_sensors]
-        logger.info(f"After missing rate filtering: {len(df.columns)} sensors (removed {len(sensor_missing_rates) - len(filtered_sensors)} sensors)")
+        logger.info(
+            f"After missing rate filtering: {len(df.columns)} sensors (removed {len(sensor_missing_rates) - len(filtered_sensors)} sensors)"
+        )
 
     # 4. 공간 필터링
     # 4.1 shapefile에서 LINK_ID 추출 후 직접 열 선택
@@ -202,13 +212,24 @@ def generate_subset_dataset(
     # 5. 시간 필터링 (DatetimeIndex 기반)
     if target_data_start:
         df = df.loc[target_data_start:]
-    
+
     if target_data_end:
         df = df.loc[:target_data_end]
 
     if target_data_start or target_data_end:
         logger.info(f"Filtering time range: {target_data_start} ~ {target_data_end}")
         logger.info(f"After temporal filtering: {len(df)} rows")
+    
+    # 데이터 보정
+    if outlier_processors:
+        logger.info("Processing outliers...")
+        for processor in outlier_processors:
+            df = processor.process(df)
+    
+    if interpolation_processors:
+        logger.info("Processing interpolation...")
+        for processor in interpolation_processors:
+            df = processor.interpolate(df)
 
     # 6. 필터링된 데이터 저장
     traffic_data.data = df
@@ -246,7 +267,9 @@ def generate_subset_dataset(
         f"Subset dataset generation completed: {subset_path_conf.root_dir_path}"
     )
 
+
 # ------------------------------------------------------------------------------ #
+
 
 def generate_metr_imc_excel(
     metr_imc_path: str = PATH_CONF.metr_imc_path,
