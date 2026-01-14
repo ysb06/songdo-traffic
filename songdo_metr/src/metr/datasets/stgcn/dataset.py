@@ -23,6 +23,8 @@ class STGCNDataset(Dataset):
         self._is_scaled = False
         
         assert len(self.x) == len(self.y), "x and y must have the same length"
+        if len(self.x) == 0:
+            raise ValueError("All samples contained NaNs and were filtered out. Check your data.")
     
     def apply_scaler(self, scaler: MinMaxScaler) -> None:
         """Apply scaling to the dataset using a fitted scaler.
@@ -31,6 +33,11 @@ class STGCNDataset(Dataset):
             scaler: Fitted MinMaxScaler instance
         """
         if self._is_scaled:
+            return
+        
+        # Skip scaling if dataset is empty
+        if len(self.x) == 0:
+            self._is_scaled = True
             return
         
         # Scale x: shape (num_samples, in_channels, n_his, n_vertex)
@@ -54,34 +61,42 @@ class STGCNDataset(Dataset):
         return self.x[idx], self.y[idx]
     
     def _data_transform(self, data: np.ndarray, n_his: int, n_pred: int):
-        """Transform time series data into STGCN input format.
-
-        Args:
-            data: numpy array of shape (time_steps, n_vertex)
-            n_his: number of historical time steps
-            n_pred: number of prediction time steps ahead
-
-        Returns:
-            x: torch.Tensor of shape (num_samples, in_channels, n_his, n_vertex)
-                Note: Model expects (batch, channels, time_steps, n_vertex)
-            y: torch.Tensor of shape (num_samples, n_vertex)
-        """
         n_vertex = data.shape[1]
         l = len(data)
         num = l - n_his - n_pred
 
         # Shape: (num_samples, in_channels, n_his, n_vertex)
         # Changed from (num_samples, in_channels, n_vertex, n_his) to match model expectation
-        x = np.zeros([num, 1, n_his, n_vertex], dtype=np.float32)
-        y = np.zeros([num, n_vertex], dtype=np.float32)
+        x_list, y_list = [], []
+        filtered_count = 0
 
         for i in range(num):
             head = i
             tail = i + n_his
+            
+            # 1. 입력(x) 및 타겟(y) 구간 추출
             # Extract historical window: shape (n_his, n_vertex)
             # Directly assign without transpose to get (n_his, n_vertex) in the last two dimensions
-            x[i, 0, :, :] = data[head:tail, :]
+            x_window = data[head:tail, :]  # (n_his, n_vertex)
             # Target is n_pred steps ahead from the last historical time step
-            y[i] = data[tail + n_pred - 1]
+            y_window = data[tail + n_pred - 1]  # (n_vertex,)
 
-        return torch.Tensor(x), torch.Tensor(y)
+            # 2. 결측치 존재 여부 확인 (Any NaN in window)
+            if np.isnan(x_window).any() or np.isnan(y_window).any():
+                filtered_count += 1
+                continue # NaN이 하나라도 있으면 해당 시점의 샘플은 건너뜀
+
+            # 3. 모델 기대 형식으로 변형하여 리스트 추가
+            x_list.append(torch.tensor(x_window).unsqueeze(0)) # (1, n_his, n_vertex)
+            y_list.append(torch.tensor(y_window))
+
+        # 리스트를 하나의 텐서로 결합
+        x = torch.stack(x_list) if x_list else torch.empty(0) # (num_samples, 1, n_his, n_vertex)
+        y = torch.stack(y_list) if y_list else torch.empty(0) # (num_samples, n_vertex)
+        
+        # Log filtering statistics
+        if num > 0:
+            retention_rate = len(x_list) / num * 100
+            print(f"Dataset filtering: {len(x_list)}/{num} samples retained ({retention_rate:.1f}%), {filtered_count} filtered due to NaNs")
+
+        return x, y

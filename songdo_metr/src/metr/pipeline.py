@@ -104,6 +104,7 @@ def generate_subset_dataset(
     target_data_start: Optional[str] = None,
     target_data_end: Optional[str] = None,
     cluster_count: Optional[int] = 1,
+    missing_rate_threshold: float = 0.9,
 ):
     """
     기존 raw 데이터셋에서 공간/시간 필터링하여 subset 데이터셋을 생성합니다.
@@ -129,8 +130,20 @@ def generate_subset_dataset(
     g_idx_to_sensor = {value: key for key, value in adj_mx_raw.sensor_id_to_idx.items()}
     logger.info(f"Original data: {len(df)} rows, {len(df.columns)} sensors")
 
-    # 3. 공간 필터링
-    # 3.1 shapefile에서 LINK_ID 추출 후 직접 열 선택
+    # 3. 결측률 필터링
+    if missing_rate_threshold < 1.0:
+        logger.info(f"Filtering sensors by missing rate threshold: {missing_rate_threshold * 100:.1f}%")
+        missing_mask = df.isna()
+        sensor_missing_counts = missing_mask.sum()
+        sensor_missing_rates = sensor_missing_counts / len(df)
+        
+        # missing_rate_threshold 미만의 결측률을 가진 센서만 선택
+        filtered_sensors = sensor_missing_rates[sensor_missing_rates < missing_rate_threshold].index.tolist()
+        df = df[filtered_sensors]
+        logger.info(f"After missing rate filtering: {len(df.columns)} sensors (removed {len(sensor_missing_rates) - len(filtered_sensors)} sensors)")
+
+    # 4. 공간 필터링
+    # 4.1 shapefile에서 LINK_ID 추출 후 직접 열 선택
     if target_nodelinks_path:
         logger.info(f"Filtering sensors from shapefile: {target_nodelinks_path}")
         target_roads = gpd.read_file(target_nodelinks_path)
@@ -140,7 +153,7 @@ def generate_subset_dataset(
         df = df[valid_link_ids]
         logger.info(f"After spatial filtering: {len(df.columns)} sensors")
 
-    # 3.2 adjacency matrix 에서 가장 큰 연결 그래프에 속한 노드들만 선택
+    # 4.2 adjacency matrix 에서 가장 큰 연결 그래프에 속한 노드들만 선택
     if cluster_count is not None and cluster_count > 0:
         # 현재 df에 남아있는 센서들의 인덱스 추출
         sensor_to_g_idx = adj_mx_raw.sensor_id_to_idx
@@ -186,18 +199,23 @@ def generate_subset_dataset(
             f"from {len(selected_components)} component(s)"
         )
 
-    # 4. 시간 필터링 (DatetimeIndex 기반)
+    # 5. 시간 필터링 (DatetimeIndex 기반)
+    if target_data_start:
+        df = df.loc[target_data_start:]
+    
+    if target_data_end:
+        df = df.loc[:target_data_end]
+
     if target_data_start or target_data_end:
         logger.info(f"Filtering time range: {target_data_start} ~ {target_data_end}")
-        df = df.loc[target_data_start:target_data_end]
         logger.info(f"After temporal filtering: {len(df)} rows")
 
-    # 5. 필터링된 데이터 저장
+    # 6. 필터링된 데이터 저장
     traffic_data.data = df
     logger.info(f"Saving filtered traffic data to {subset_path_conf.metr_imc_path}")
     traffic_data.to_hdf(subset_path_conf.metr_imc_path)
 
-    # 6. generate_dataset() 호출 (subset PathConfig의 경로 사용)
+    # 7. generate_dataset() 호출 (subset PathConfig의 경로 사용)
     logger.info("Generating dataset components...")
     generate_dataset(
         traffic_data_path=subset_path_conf.metr_imc_path,
@@ -210,7 +228,7 @@ def generate_subset_dataset(
         adj_mx_output_path=subset_path_conf.adj_mx_path,
     )
 
-    # 7. shapefile 생성
+    # 8. shapefile 생성
     logger.info("Generating shapefiles...")
     generate_metr_imc_shapefile(
         metr_imc_path=subset_path_conf.metr_imc_path,

@@ -112,6 +112,12 @@ class STGCNDataModule(L.LightningDataModule):
                 self.n_pred,
             )
             
+            # Warn if datasets are too small
+            if len(self.training_dataset) < self.batch_size:
+                print(f"WARNING: Training dataset ({len(self.training_dataset)} samples) is smaller than batch_size ({self.batch_size})")
+            if len(self.validation_dataset) < self.batch_size:
+                print(f"WARNING: Validation dataset ({len(self.validation_dataset)} samples) is smaller than batch_size ({self.batch_size})")
+            
             # Prepare and apply scaling
             self._prepare_scaler(training_data_array)
             self._apply_scaling(self.training_dataset, self.validation_dataset)
@@ -122,6 +128,10 @@ class STGCNDataModule(L.LightningDataModule):
             test_data_df = test_data_df[ordered_sensor_ids]
             test_data_array = test_data_df.values  # (time_steps, n_vertex)
             self.test_dataset = STGCNDataset(test_data_array, self.n_his, self.n_pred)
+            
+            # Warn if test dataset is too small
+            if len(self.test_dataset) < self.batch_size:
+                print(f"WARNING: Test dataset ({len(self.test_dataset)} samples) is smaller than batch_size ({self.batch_size})")
             
             # Apply scaling to test dataset (scaler should be already fitted)
             if self._scaler is not None:
