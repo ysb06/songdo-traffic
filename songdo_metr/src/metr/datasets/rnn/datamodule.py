@@ -233,9 +233,9 @@ class MultiSensorTrafficDataModule(L.LightningDataModule):
     def __init__(
         self,
         dataset_path: str,
-        training_period: Tuple[str, str] = ("2022-11-01 00:00:00", "2024-07-31 23:59:59"),
-        validation_period: Tuple[str, str] = ("2024-08-01 00:00:00", "2024-09-30 23:59:59"),
-        test_period: Tuple[str, str] = ("2024-10-01 00:00:00", "2024-10-31 23:59:59"),
+        training_period: Tuple[str, str] = ("2023-01-26 00:00:00", "2025-09-31 23:59:59"),
+        validation_period: Tuple[str, str] = ("2025-10-01 00:00:00", "2025-11-30 23:59:59"),
+        test_period: Tuple[str, str] = ("2025-12-01 00:00:00", "2025-12-31 23:59:59"),
         seq_length: int = 24,
         batch_size: int = 512,
         num_workers: int = 0,
