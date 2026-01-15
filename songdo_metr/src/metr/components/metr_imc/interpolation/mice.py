@@ -11,7 +11,7 @@ import warnings
 from .base import Interpolator
 
 
-class MICEInterpolator(Interpolator):
+class BaseMICEInterpolator(Interpolator):
     """
     MICE (Multivariate Imputation by Chained Equations) Interpolator
 
