@@ -18,3 +18,9 @@ Currently, the project involves downloading and transforming data for the entire
 
 2. 인천시 교통량 데이터
   - https://www.data.go.kr/data/15113145/openapi.do
+
+
+### Algorithms
+
+1. BGCP
+  - https://github.com/xinychen/transdim

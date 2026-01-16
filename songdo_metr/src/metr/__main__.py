@@ -3,8 +3,9 @@ import pickle
 from typing import List
 
 from metr.components.metr_imc.interpolation import Interpolator
-from metr.components.metr_imc.interpolation.mice import BaseMICEInterpolator
+from metr.components.metr_imc.interpolation.mice import SpatialMICEInterpolator
 from metr.components.metr_imc.interpolation.knn import SpatialKNNInterpolator
+from metr.components.metr_imc.interpolation.bgcp import BGCPInterpolator
 from metr.components.metr_imc.outlier import OutlierProcessor
 from metr.components.metr_imc.outlier.base import SimpleAbsoluteOutlierProcessor
 from metr.pipeline import generate_raw_dataset, generate_subset
@@ -29,15 +30,16 @@ logging.basicConfig(
 
 # Generate Final Subset Datasets with Data Correction
 raw_path_conf = PathConfig.from_yaml("../config.yaml")
-subset_path_conf = PathConfig.from_yaml("../config_knn.yaml")
+subset_path_conf = PathConfig.from_yaml("../config_bgcp.yaml")
 adj_mx = AdjacencyMatrix.import_from_pickle(raw_path_conf.adj_mx_path)
 
 outlier_processors: List[OutlierProcessor] = [
     SimpleAbsoluteOutlierProcessor(threshold=3450),  # Example threshold
 ]
 interpolation_processors: List[Interpolator] = [
-    # BaseMICEInterpolator(verbose=2, suppress_warnings=False),
-    SpatialKNNInterpolator(adj_mx)
+    # SpatialKNNInterpolator(adj_mx),
+    # SpatialMICEInterpolator(adj_mx),
+    BGCPInterpolator(),
 ]
 
 generate_subset(
