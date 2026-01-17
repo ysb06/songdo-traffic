@@ -7,13 +7,15 @@ from lightning.pytorch.callbacks import (
 )
 from lightning.pytorch.loggers import WandbLogger
 from metr.components.adj_mx import AdjacencyMatrix
-from metr.datasets.stgcn.datamodule import STGCNDataModule, STGCNDataModuleByDate
+from metr.datasets.stgcn.datamodule import STGCNDataModule, STGCNDataModuleByDate, STGCNSplitDataModule
+
+from metr.utils import PathConfig
 
 from .models.stgcn.module import STGCNLightningModule
 from .models.stgcn.utils import prepare_gso_for_model
 
 
-def main(dataset_root_dir = "./data/selected_small_v1"):
+def main(path_config: PathConfig):
     # Configuration
     output_dir = "./output/stgcn"
     
@@ -37,7 +39,7 @@ def main(dataset_root_dir = "./data/selected_small_v1"):
     
     # Load adjacency matrix and prepare GSO
     print("Loading adjacency matrix...")
-    adj_mx_obj = AdjacencyMatrix.import_from_pickle(f"{dataset_root_dir}/adj_mx.pkl")
+    adj_mx_obj = AdjacencyMatrix.import_from_pickle(path_config.adj_mx_path)
     adj_mx = adj_mx_obj.adj_mx
     n_vertex = adj_mx.shape[0]
     print(f"Number of vertices (sensors): {n_vertex}")
@@ -54,20 +56,20 @@ def main(dataset_root_dir = "./data/selected_small_v1"):
     
     # Initialize data module
     print("Creating data module...")
-    data = STGCNDataModuleByDate(
-        dataset_dir_path=dataset_root_dir,
+    data = STGCNSplitDataModule(
+        training_data_path=path_config.metr_imc_training_path,
+        test_data_path=path_config.metr_imc_test_path,
+        test_missing_path=path_config.metr_imc_test_missing_path,
+        adj_mx_path=path_config.adj_mx_path,
         n_his=n_his,
         n_pred=n_pred,
         batch_size=batch_size,
         num_workers=4,
         shuffle_training=True,
-        # Using default date periods:
-        # training: 2023-01-26 ~ 2025-09-30
-        # validation: 2025-10-01 ~ 2025-11-30
-        # test: 2025-12-01 ~ 2025-12-31
-        # Adjust periods if your dataset has different date range
+        train_val_split=0.8,
     )
-    
+
+
     # Setup data module to get scaler
     print("Setting up data module...")
     data.setup("fit")

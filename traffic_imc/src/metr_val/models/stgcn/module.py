@@ -154,10 +154,10 @@ class STGCNLightningModule(L.LightningModule):
         return loss
 
     def test_step(
-        self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int
+        self, batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor], batch_idx: int
     ) -> torch.Tensor:
         """Test step"""
-        x, y = batch  # Simple collate function
+        x, y, missing = batch  # Simple collate function
         y_hat: torch.Tensor = self(x)
 
         # Reshape model output from (batch, 1, 1, n_vertex) to (batch, n_vertex)
@@ -165,12 +165,13 @@ class STGCNLightningModule(L.LightningModule):
 
         loss: torch.Tensor = self.criterion(y_hat, y)
 
-        # Store outputs for epoch-end metrics
+        # Store outputs for epoch-end metrics (including missing mask)
         self.test_outputs.append(
             {
                 "y_true": y.cpu().numpy(),
                 "y_pred": y_hat.cpu().numpy(),
                 "loss": loss.item(),
+                "is_missing": missing.cpu().numpy(),
             }
         )
 
@@ -198,31 +199,53 @@ class STGCNLightningModule(L.LightningModule):
         self.validation_outputs.clear()
 
     def on_test_epoch_end(self):
-        """Calculate test metrics at the end of epoch"""
+        """Calculate test metrics at the end of epoch (excluding interpolated data)"""
         if len(self.test_outputs) == 0:
             return
 
-        # Concatenate all predictions and targets
+        # Concatenate all predictions, targets, and missing masks
         y_true = np.concatenate([x["y_true"] for x in self.test_outputs], axis=0)
         y_pred = np.concatenate([x["y_pred"] for x in self.test_outputs], axis=0)
+        is_missing = np.concatenate([x["is_missing"] for x in self.test_outputs], axis=0)
 
-        # Calculate metrics on scaled data
-        mae_scaled = mean_absolute_error(y_true.flatten(), y_pred.flatten())
-        rmse_scaled = np.sqrt(mean_squared_error(y_true.flatten(), y_pred.flatten()))
-        # MAPE with zero-division handling
+        # Flatten all arrays
         y_true_flat = y_true.flatten()
         y_pred_flat = y_pred.flatten()
-        mask = y_true_flat != 0
+        is_missing_flat = is_missing.flatten()
+
+        # Create mask for valid (non-interpolated) data points
+        valid_mask = ~is_missing_flat  # True = original data (not interpolated)
+        
+        # Count statistics
+        total_points = len(y_true_flat)
+        valid_points = valid_mask.sum()
+        interpolated_points = total_points - valid_points
+        
+        print(f"\nTest Data Statistics:")
+        print(f"  Total points: {total_points}")
+        print(f"  Valid (original) points: {valid_points} ({valid_points/total_points*100:.1f}%)")
+        print(f"  Interpolated points (excluded): {interpolated_points} ({interpolated_points/total_points*100:.1f}%)")
+
+        # Filter to only valid (non-interpolated) data
+        y_true_valid = y_true_flat[valid_mask]
+        y_pred_valid = y_pred_flat[valid_mask]
+
+        # Calculate metrics on scaled data (only valid points)
+        mae_scaled = mean_absolute_error(y_true_valid, y_pred_valid)
+        rmse_scaled = np.sqrt(mean_squared_error(y_true_valid, y_pred_valid))
+        
+        # MAPE with zero-division handling
+        nonzero_mask = y_true_valid != 0
         mape_scaled = (
-            np.mean(np.abs((y_true_flat[mask] - y_pred_flat[mask]) / y_true_flat[mask]))
+            np.mean(np.abs((y_true_valid[nonzero_mask] - y_pred_valid[nonzero_mask]) / y_true_valid[nonzero_mask]))
             * 100
-        ) if mask.any() else 0.0
+        ) if nonzero_mask.any() else 0.0
 
         self.log("test_mae", mae_scaled)
         self.log("test_rmse", rmse_scaled)
         self.log("test_mape", mape_scaled)
 
-        print(f"\nTest Results (Scaled):")
+        print(f"\nTest Results (Scaled, Excluding Interpolated):")
         print(f"  MAE:  {mae_scaled:.4f}")
         print(f"  RMSE: {rmse_scaled:.4f}")
         print(f"  MAPE: {mape_scaled:.4f}%")
@@ -232,29 +255,29 @@ class STGCNLightningModule(L.LightningModule):
             y_true_unscaled = self._inverse_transform(y_true)
             y_pred_unscaled = self._inverse_transform(y_pred)
             
-            mae_unscaled = mean_absolute_error(
-                y_true_unscaled.flatten(), y_pred_unscaled.flatten()
-            )
-            rmse_unscaled = np.sqrt(mean_squared_error(
-                y_true_unscaled.flatten(), y_pred_unscaled.flatten()
-            ))
-            
-            # MAPE with zero-division handling
+            # Flatten and filter unscaled data
             y_true_unscaled_flat = y_true_unscaled.flatten()
             y_pred_unscaled_flat = y_pred_unscaled.flatten()
-            mask_unscaled = y_true_unscaled_flat != 0
+            y_true_unscaled_valid = y_true_unscaled_flat[valid_mask]
+            y_pred_unscaled_valid = y_pred_unscaled_flat[valid_mask]
+            
+            mae_unscaled = mean_absolute_error(y_true_unscaled_valid, y_pred_unscaled_valid)
+            rmse_unscaled = np.sqrt(mean_squared_error(y_true_unscaled_valid, y_pred_unscaled_valid))
+            
+            # MAPE with zero-division handling
+            nonzero_mask_unscaled = y_true_unscaled_valid != 0
             mape_unscaled = (
                 np.mean(np.abs(
-                    (y_true_unscaled_flat[mask_unscaled] - y_pred_unscaled_flat[mask_unscaled])
-                    / y_true_unscaled_flat[mask_unscaled]
+                    (y_true_unscaled_valid[nonzero_mask_unscaled] - y_pred_unscaled_valid[nonzero_mask_unscaled])
+                    / y_true_unscaled_valid[nonzero_mask_unscaled]
                 )) * 100
-            ) if mask_unscaled.any() else 0.0
+            ) if nonzero_mask_unscaled.any() else 0.0
             
             self.log("test_mae_unscaled", mae_unscaled)
             self.log("test_rmse_unscaled", rmse_unscaled)
             self.log("test_mape_unscaled", mape_unscaled)
             
-            print(f"\nTest Results (Original Scale):")
+            print(f"\nTest Results (Original Scale, Excluding Interpolated):")
             print(f"  MAE:  {mae_unscaled:.4f}")
             print(f"  RMSE: {rmse_unscaled:.4f}")
             print(f"  MAPE: {mape_unscaled:.4f}%")

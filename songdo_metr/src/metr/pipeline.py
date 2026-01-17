@@ -277,7 +277,7 @@ def generate_subset(
     logger.info("Extracting test data from interpolated full data...")
     test_df_interpolated = full_traffic_data.data.loc[TRAINING_END_DATE:].copy()
     test_traffic_data = TrafficData(test_df_interpolated)
-
+    # Todo: 모든 데이터는 처리 완료 후 저장되도록 수정하기
     # 13. 모든 데이터 저장
     logger.info("Saving all processed datasets...")
     # 13.1 전체 데이터 (new_raw_data)

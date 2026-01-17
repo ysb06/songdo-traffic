@@ -1,4 +1,4 @@
-from .rnn import main
+from .stgcn import main
 from metr.utils import PathConfig
 
 if __name__ == "__main__":
