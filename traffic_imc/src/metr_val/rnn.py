@@ -22,7 +22,9 @@ def main(path_config: PathConfig):
     model = MultiSensorLSTMLightningModule(scaler=data.scaler)
 
     output_dir = "./output/lstm"
-    wandb_logger = WandbLogger(project="Traffic-IMC-LSTM", log_model="all")
+    wandb_logger = WandbLogger(
+        name="LSTM-MICE-00", project="IMC-Traffic", log_model="all"
+    )
 
     trainer = Trainer(
         max_epochs=100,
