@@ -13,9 +13,14 @@ from metr.components import (
     Metadata,
     SensorLocations,
     TrafficData,
+    MissingMasks,
 )
 from metr.components.metr_imc.outlier import OutlierProcessor
 from metr.components.metr_imc.interpolation import Interpolator
+from metr.components.metr_imc.outlier.base import (
+    SimpleAbsoluteOutlierProcessor,
+    RemovingWeirdZeroOutlierProcessor,
+)
 from metr.imcrts.collector import IMCRTSCollector
 from metr.nodelink.converter import NodeLink
 from metr.nodelink.downloader import download_nodelink
@@ -44,7 +49,8 @@ TARGET_REGION_CODES = [
     "169",
 ]  # All Incheon Regions
 IMCRTS_START_DATE = "20230101"
-IMCRTS_END_DATE = "20251231"
+IMCRTS_END_DATE = "20260115"
+TRAINING_END_DATE = "2025-11-30 23:59:59"
 
 
 # def generate_subset_dataset(
@@ -134,24 +140,6 @@ def generate_subset(
     g_idx_to_sensor = {value: key for key, value in adj_mx_raw.sensor_id_to_idx.items()}
     logger.info(f"Original data: {len(df)} rows, {len(df.columns)} sensors")
 
-    # 3. 결측률 필터링
-    if missing_rate_threshold < 1.0:
-        logger.info(
-            f"Filtering sensors by missing rate threshold: {missing_rate_threshold * 100:.1f}%"
-        )
-        missing_mask = df.isna()
-        sensor_missing_counts = missing_mask.sum()
-        sensor_missing_rates = sensor_missing_counts / len(df)
-
-        # missing_rate_threshold 미만의 결측률을 가진 센서만 선택
-        filtered_sensors = sensor_missing_rates[
-            sensor_missing_rates < missing_rate_threshold
-        ].index.tolist()
-        df = df[filtered_sensors]
-        logger.info(
-            f"After missing rate filtering: {len(df.columns)} sensors (removed {len(sensor_missing_rates) - len(filtered_sensors)} sensors)"
-        )
-
     # 4. 공간 필터링
     # 4.1 shapefile에서 LINK_ID 추출 후 직접 열 선택
     if target_nodelinks_path:
@@ -219,24 +207,97 @@ def generate_subset(
     if target_data_start or target_data_end:
         logger.info(f"Filtering time range: {target_data_start} ~ {target_data_end}")
         logger.info(f"After temporal filtering: {len(df)} rows")
-    
-    # 데이터 보정
-    if outlier_processors:
-        logger.info("Processing outliers...")
-        for processor in outlier_processors:
-            df = processor.process(df)
-    
-    if interpolation_processors:
-        logger.info("Processing interpolation...")
-        for processor in interpolation_processors:
-            df = processor.interpolate(df)
 
-    # 6. 필터링된 데이터 저장
+    # 6. 기본 데이터 보정 처리
+    # 6.1. 결측률 필터링 (현재 DataFrame 기준 결측률 계산)
+    if missing_rate_threshold < 1.0:
+        logger.info(
+            f"Filtering sensors by missing rate threshold: {missing_rate_threshold * 100:.1f}%"
+        )
+        missing_mask = df.isna()
+        sensor_missing_counts = missing_mask.sum()
+        sensor_missing_rates = sensor_missing_counts / len(df)
+
+        # missing_rate_threshold 미만의 결측률을 가진 센서만 선택
+        filtered_sensors = sensor_missing_rates[
+            sensor_missing_rates < missing_rate_threshold
+        ].index.tolist()
+        df = df[filtered_sensors]
+        logger.info(
+            f"After missing rate filtering: {len(df.columns)} sensors (removed {len(sensor_missing_rates) - len(filtered_sensors)} sensors)"
+        )
+
+    # 6.2 기본 이상치 처리 및 보간
+    logger.info("Processing default outliers...")
+    default_outlier_processors: List[OutlierProcessor] = [
+        SimpleAbsoluteOutlierProcessor(threshold=3450),
+        RemovingWeirdZeroOutlierProcessor(),
+    ]
+    for processor in default_outlier_processors:
+        df = processor.process(df)
+
+    # 6.3 기본 결측치 마스크 생성 (보간 전)
+    logger.info("Creating missing masks before interpolation...")
+    missing_mask = MissingMasks.import_from_traffic_data_frame(df)
+
+    # 7. 필터링된 데이터 업데이트
     traffic_data.data = df
-    logger.info(f"Saving filtered traffic data to {subset_path_conf.metr_imc_path}")
-    traffic_data.to_hdf(subset_path_conf.metr_imc_path)
 
-    # 7. generate_dataset() 호출 (subset PathConfig의 경로 사용)
+    # 8. Train/Test 시간 분할 (보간 전 데이터)
+    logger.info("Splitting train/test data (before interpolation)...")
+    training_df = df.loc[:TRAINING_END_DATE].copy()
+    test_df_raw = df.loc[TRAINING_END_DATE:].copy()
+    logger.info(
+        f"Training data: {len(training_df)} rows, Test data: {len(test_df_raw)} rows"
+    )
+
+    # 9. Train/Test missing masks 분리 (보간 전)
+    training_missing = missing_mask.data.loc[training_df.index, training_df.columns]
+    test_missing = missing_mask.data.loc[test_df_raw.index, test_df_raw.columns]
+
+    # 10. 학습 데이터에 사용자 요청 이상치 및 결측치 보간 처리
+    logger.info("Processing outliers and interpolation on training data only...")
+    training_traffic_data = TrafficData(training_df)
+    _apply_outlier_and_interpolation_inplace(
+        traffic_data=training_traffic_data,
+        outlier_processors=outlier_processors,
+        interpolation_processors=interpolation_processors,
+    )
+
+    # 11. 전체 데이터에 사용자 요청 이상치 및 결측치 보간 처리
+    logger.info("Processing outliers and interpolation on full data...")
+    full_traffic_data = TrafficData(df.copy())
+    _apply_outlier_and_interpolation_inplace(
+        traffic_data=full_traffic_data,
+        outlier_processors=outlier_processors,
+        interpolation_processors=interpolation_processors,
+    )
+
+    # 12. 보간된 전체 데이터에서 테스트 데이터 분리
+    logger.info("Extracting test data from interpolated full data...")
+    test_df_interpolated = full_traffic_data.data.loc[TRAINING_END_DATE:].copy()
+    test_traffic_data = TrafficData(test_df_interpolated)
+
+    # 13. 모든 데이터 저장
+    logger.info("Saving all processed datasets...")
+    # 13.1 전체 데이터 (new_raw_data)
+    logger.info(f"Saving interpolated full data to {subset_path_conf.metr_imc_path}")
+    full_traffic_data.to_hdf(subset_path_conf.metr_imc_path)
+    missing_mask.to_hdf(subset_path_conf.metr_imc_missing_path)
+
+    # 13.2 학습 데이터
+    logger.info(f"Saving training data to {subset_path_conf.metr_imc_training_path}")
+    training_traffic_data.to_hdf(subset_path_conf.metr_imc_training_path)
+    MissingMasks(training_missing).to_hdf(
+        subset_path_conf.metr_imc_training_missing_path
+    )
+
+    # 13.3 테스트 데이터
+    logger.info(f"Saving test data to {subset_path_conf.metr_imc_test_path}")
+    test_traffic_data.to_hdf(subset_path_conf.metr_imc_test_path)
+    MissingMasks(test_missing).to_hdf(subset_path_conf.metr_imc_test_missing_path)
+
+    # 14. generate_dataset() 호출 (subset PathConfig의 경로 사용)
     logger.info("Generating dataset components...")
     generate_dataset(
         traffic_data_path=subset_path_conf.metr_imc_path,
@@ -249,7 +310,7 @@ def generate_subset(
         adj_mx_output_path=subset_path_conf.adj_mx_path,
     )
 
-    # 8. shapefile 생성
+    # 15. shapefile 생성
     logger.info("Generating shapefiles...")
     generate_metr_imc_shapefile(
         metr_imc_path=subset_path_conf.metr_imc_path,
@@ -269,6 +330,29 @@ def generate_subset(
 
 
 # ------------------------------------------------------------------------------ #
+
+
+def _apply_outlier_and_interpolation_inplace(
+    traffic_data: TrafficData,
+    outlier_processors: Optional[List[OutlierProcessor]],
+    interpolation_processors: Optional[List[Interpolator]],
+):
+    """
+    TrafficData 객체에 이상치 처리 및 보간을 in-place로 적용합니다.
+    """
+    df = traffic_data.data
+
+    if outlier_processors:
+        logger.info("Processing outliers...")
+        for processor in outlier_processors:
+            df = processor.process(df)
+
+    if interpolation_processors:
+        logger.info("Processing interpolation...")
+        for processor in interpolation_processors:
+            df = processor.interpolate(df)
+
+    traffic_data.data = df
 
 
 def generate_metr_imc_excel(
@@ -332,9 +416,11 @@ def generate_distances_shapefile(
 
 
 def generate_dataset(
+    # Inputs
     traffic_data_path: str = PATH_CONF.metr_imc_path,
     nodelink_link_path: str = PATH_CONF.nodelink_link_path,
     nodelink_turn_path: str = PATH_CONF.nodelink_turn_path,
+    # Outputs
     ids_output_path: str = PATH_CONF.sensor_ids_path,
     metadata_output_path: str = PATH_CONF.metadata_path,
     sensor_locations_output_path: str = PATH_CONF.sensor_locations_path,
@@ -413,16 +499,23 @@ def generate_imcrts_raw(
 
 
 def generate_metr_imc_raw(
+    # Inputs
     road_data_path: str = PATH_CONF.nodelink_link_path,
     traffic_data_path: str = PATH_CONF.imcrts_path,
+    # Outputs
     metr_imc_path: str = PATH_CONF.metr_imc_path,
+    metr_imc_missing_path: str = PATH_CONF.metr_imc_missing_path,
 ):
     road_data: gpd.GeoDataFrame = gpd.read_file(road_data_path)
     traffic_data = TrafficData.import_from_pickle(traffic_data_path)
 
     logger.info("Matching Link IDs...")
     traffic_data.select_sensors(road_data["LINK_ID"].tolist())
+    logger.info(f"Saving Traffic Data to {metr_imc_path}...")
     traffic_data.to_hdf(metr_imc_path)
+    missing_masks = MissingMasks.import_from_traffic_data(traffic_data)
+    logger.info(f"Saving Missing Masks to {metr_imc_missing_path}...")
+    missing_masks.to_hdf(metr_imc_missing_path)
     logger.info("Matching Done")
 
 
@@ -436,3 +529,42 @@ def generate_metr_imc_shapefile(
     traffic_link_ids = set(traffic_data.data.columns)
     filtered_roads = road_data[road_data["LINK_ID"].isin(traffic_link_ids)].copy()
     filtered_roads.to_file(output_path)
+
+
+def split_train_test_data(
+    raw_dataset_path: str = PATH_CONF.metr_imc_path,
+    raw_missing_path: str = PATH_CONF.metr_imc_missing_path,
+    training_dataset_path: str = PATH_CONF.metr_imc_training_path,
+    training_missing_path: str = PATH_CONF.metr_imc_training_missing_path,
+    test_dataset_path: str = PATH_CONF.metr_imc_test_path,
+    test_missing_path: str = PATH_CONF.metr_imc_test_missing_path,
+    training_end_date: str = TRAINING_END_DATE,
+):
+    traffic_data = TrafficData.import_from_hdf(raw_dataset_path)
+    missing_masks = MissingMasks.import_from_hdf(raw_missing_path)
+    df = traffic_data.data
+
+    training_data = df.loc[:training_end_date]
+    test_data = df.loc[training_end_date:]
+
+    training_missing = missing_masks.data.loc[
+        training_data.index[0] : training_data.index[-1], training_data.columns
+    ]
+    test_missing = missing_masks.data.loc[
+        test_data.index[0] : test_data.index[-1], test_data.columns
+    ]
+
+    training_traffic_data = TrafficData(training_data)
+    test_traffic_data = TrafficData(test_data)
+
+    training_missing_masks = MissingMasks(training_missing)
+    test_missing_masks = MissingMasks(test_missing)
+
+    logger.info(f"Saving training data to {training_dataset_path}...")
+    training_traffic_data.to_hdf(training_dataset_path)
+    logger.info(f"Saving training missing masks to {training_missing_path}...")
+    training_missing_masks.to_hdf(training_missing_path)
+    logger.info(f"Saving test data to {test_dataset_path}...")
+    test_traffic_data.to_hdf(test_dataset_path)
+    logger.info(f"Saving test missing masks to {test_missing_path}...")
+    test_missing_masks.to_hdf(test_missing_path)

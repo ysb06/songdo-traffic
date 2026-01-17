@@ -148,3 +148,31 @@ def get_raw(path: str) -> TrafficData:
         raise FileNotFoundError(f"File not found: {path}")
 
     return TrafficData.import_from_hdf(path)
+
+
+class MissingMasks:
+    @staticmethod
+    def import_from_traffic_data(traffic_data: TrafficData) -> "MissingMasks":
+        missing_mask = traffic_data.data.isna()
+        return MissingMasks(missing_mask)
+    
+    @staticmethod
+    def import_from_traffic_data_frame(traffic_data_df: pd.DataFrame) -> "MissingMasks":
+        missing_mask = traffic_data_df.isna()
+        return MissingMasks(missing_mask)
+
+    @staticmethod
+    def import_from_hdf(filepath: str, key: str = "data") -> "MissingMasks":
+        logger.info(f"Loading missing mask from {filepath}...")
+        missing_mask = pd.read_hdf(filepath, key=key)
+        if type(missing_mask) is not pd.DataFrame:
+            raise ValueError("Missing mask data is not a DataFrame")
+        return MissingMasks(missing_mask)
+
+    def __init__(self, missing_mask: pd.DataFrame) -> None:
+        self.data = missing_mask
+
+    def to_hdf(self, filepath: str, key: str = "data") -> None:
+        logger.info(f"Saving missing mask to {filepath}...")
+        self.data.to_hdf(filepath, key=key)
+        logger.info(f"Saving Complete...{self.data.shape}")

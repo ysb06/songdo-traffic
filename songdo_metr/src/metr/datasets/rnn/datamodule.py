@@ -8,14 +8,22 @@ from sklearn.preprocessing import MinMaxScaler
 from torch.utils.data import ConcatDataset, DataLoader, Subset
 from tqdm import tqdm
 
-from metr.datasets.rnn.dataloader import collate_simple, collate_multi_sensor
-from metr.datasets.rnn.dataset import TrafficDataset, TrafficDataType, TrafficMultiSensorDataset, TrafficMultiSensorDataType
+from metr.datasets.rnn.dataloader import collate_simple, collate_multi_sensor, collate_multi_sensor_with_missing
+from metr.datasets.rnn.dataset import (
+    TrafficDataset,
+    TrafficDataType,
+    TrafficMultiSensorDataset,
+    TrafficMultiSensorDataType,
+    TrafficMultiSensorWithMissingDataType,
+)
 from metr.components.metr_imc.traffic_data import get_raw
+from metr.components import MissingMasks
 
 logger = logging.getLogger(__name__)
 
 CollateFnInput = List[TrafficDataType]
 MultiSensorCollateFnInput = List[TrafficMultiSensorDataType]
+MultiSensorWithMissingCollateFnInput = List[TrafficMultiSensorWithMissingDataType]
 
 
 class SimpleTrafficDataModule(L.LightningDataModule):
@@ -223,38 +231,44 @@ class SimpleTrafficDataModule(L.LightningDataModule):
         self._scaler = MinMaxScaler(feature_range=(0, 1))
         self._scaler.fit(ref_data)
 
+# ---------------------------------------------------------------------------- #
+# ---------------------------------------------------------------------------- #
 
 class MultiSensorTrafficDataModule(L.LightningDataModule):
     """TrafficMultiSensorDataset을 사용하는 개선된 Lightning DataModule.
     
     센서별 정보를 포함한 다중 센서 데이터 처리를 위한 최적화된 DataModule.
+    Training 데이터와 Test 데이터를 별도 파일에서 로드하며,
+    Training 데이터는 비율에 따라 train/validation으로 분할합니다.
     """
     
     def __init__(
         self,
-        dataset_path: str,
-        training_period: Tuple[str, str] = ("2023-01-26 00:00:00", "2025-09-30 23:59:59"),
-        validation_period: Tuple[str, str] = ("2025-10-01 00:00:00", "2025-11-30 23:59:59"),
-        test_period: Tuple[str, str] = ("2025-12-01 00:00:00", "2025-12-31 23:59:59"),
+        training_dataset_path: str,
+        test_dataset_path: str,
+        test_missing_path: str,
+        train_val_split: float = 0.8,
         seq_length: int = 24,
         batch_size: int = 512,
         num_workers: int = 0,
         shuffle_training: bool = True,
         collate_fn: Callable[[MultiSensorCollateFnInput], Tuple] = collate_multi_sensor,
+        test_collate_fn: Callable[[MultiSensorWithMissingCollateFnInput], Tuple] = collate_multi_sensor_with_missing,
         target_sensors: Optional[List[str]] = None,
         scale_method: Optional[Literal["normal", "strict", "none"]] = "normal",
     ):
         """
         Args:
-            dataset_path: 데이터셋 파일 경로 (.h5)
-            training_period: 훈련 데이터 기간 (시작, 끝)
-            validation_period: 검증 데이터 기간 (시작, 끝)
-            test_period: 테스트 데이터 기간 (시작, 끝)
+            training_dataset_path: 학습용 데이터셋 파일 경로 (.h5)
+            test_dataset_path: 테스트용 데이터셋 파일 경로 (.h5)
+            test_missing_path: 테스트 데이터의 missing mask 파일 경로 (.h5)
+            train_val_split: Train/Validation 분할 비율 (기본값: 0.8 = 80% train, 20% val)
             seq_length: 시퀀스 길이
             batch_size: 배치 크기
             num_workers: DataLoader worker 수
             shuffle_training: 훈련 데이터 셔플 여부
-            collate_fn: 배치 처리 함수
+            collate_fn: Train/Validation용 배치 처리 함수
+            test_collate_fn: Test용 배치 처리 함수 (missing 정보 포함)
             target_sensors: 대상 센서 목록 (None이면 모든 센서 사용)
             scale_method: 스케일링 방법 ("normal", "strict", "none" 또는 None)
                 - "normal": 전체 훈련 기간 데이터로 스케일링
@@ -262,16 +276,17 @@ class MultiSensorTrafficDataModule(L.LightningDataModule):
                 - "none" 또는 None: 스케일링 적용 안함
         """
         super().__init__()
-        self.dataset_path = dataset_path
-        self.training_period = training_period
-        self.validation_period = validation_period
-        self.test_period = test_period
+        self.training_dataset_path = training_dataset_path
+        self.test_dataset_path = test_dataset_path
+        self.test_missing_path = test_missing_path
+        self.train_val_split = train_val_split
         
         self.seq_length = seq_length
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.shuffle_training = shuffle_training
         self.collate_fn = collate_fn
+        self.test_collate_fn = test_collate_fn
         self.target_sensors = target_sensors
         self.scale_method = scale_method
         
@@ -290,30 +305,56 @@ class MultiSensorTrafficDataModule(L.LightningDataModule):
             
         if self._scaler is None:
             logger.info("Scaler not found. Creating scaler from training data...")
-            train_df, _, _ = self._load_and_split_data()
+            train_df, _ = self._load_training_data()
             self._prepare_scaler(train_df)
 
         return self._scaler
 
-    def _load_and_split_data(self) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-        """데이터 로드 및 기간별 분할."""
-        logger.info(f"Loading data from {self.dataset_path}")
-        raw = get_raw(self.dataset_path)
+    def _load_training_data(self) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """학습 데이터 로드 및 train/val 분할."""
+        logger.info(f"Loading training data from {self.training_dataset_path}")
+        raw = get_raw(self.training_dataset_path)
         raw_df = raw.data
         
         # 대상 센서 필터링
         if self.target_sensors is not None:
-            logger.info(f"Filtering to target sensors: {self.target_sensors}")
+            logger.info(f"Filtering to target sensors: {len(self.target_sensors)} sensors")
             raw_df = raw_df.loc[:, self.target_sensors]
         
-        # 기간별 데이터 분할
-        train_df = raw_df.loc[self.training_period[0]:self.training_period[1]]
-        val_df = raw_df.loc[self.validation_period[0]:self.validation_period[1]]
-        test_df = raw_df.loc[self.test_period[0]:self.test_period[1]]
+        # 시간순 분할 (비율 기반)
+        total_rows = len(raw_df)
+        split_idx = int(total_rows * self.train_val_split)
         
-        logger.info(f"Data split - Train: {len(train_df)}, Val: {len(val_df)}, Test: {len(test_df)}")
+        train_df = raw_df.iloc[:split_idx]
+        val_df = raw_df.iloc[split_idx:]
         
-        return train_df, val_df, test_df
+        logger.info(
+            f"Training data split - Train: {len(train_df)} rows "
+            f"({self.train_val_split * 100:.0f}%), "
+            f"Val: {len(val_df)} rows ({(1 - self.train_val_split) * 100:.0f}%)"
+        )
+        
+        return train_df, val_df
+
+    def _load_test_data(self) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """테스트 데이터 및 missing mask 로드."""
+        logger.info(f"Loading test data from {self.test_dataset_path}")
+        raw = get_raw(self.test_dataset_path)
+        raw_df = raw.data
+        
+        # Missing mask 로드
+        logger.info(f"Loading test missing mask from {self.test_missing_path}")
+        missing_masks = MissingMasks.import_from_hdf(self.test_missing_path)
+        missing_mask = missing_masks.data
+        
+        # 대상 센서 필터링
+        if self.target_sensors is not None:
+            raw_df = raw_df.loc[:, self.target_sensors]
+            missing_mask = missing_mask.loc[:, self.target_sensors]
+        
+        logger.info(f"Test data loaded: {len(raw_df)} rows")
+        
+        return raw_df, missing_mask
     
     def _prepare_scaler(self, train_df: pd.DataFrame) -> None:
         """스케일러 준비 및 피팅."""
@@ -366,8 +407,11 @@ class MultiSensorTrafficDataModule(L.LightningDataModule):
         """데이터 준비 및 설정."""
         logger.info(f"Setting up data for stage: {stage}")
         
-        # 데이터 로드 및 분할
-        train_df, val_df, test_df = self._load_and_split_data()
+        # 학습 데이터 로드 및 분할
+        train_df, val_df = self._load_training_data()
+        
+        # 테스트 데이터 및 missing mask 로드
+        test_df, test_missing_mask = self._load_test_data()
         
         # 데이터셋 생성
         logger.info("Creating multi-sensor datasets")
@@ -377,11 +421,13 @@ class MultiSensorTrafficDataModule(L.LightningDataModule):
         self.val_dataset = TrafficMultiSensorDataset(
             val_df, seq_length=self.seq_length, allow_nan=False
         )
+        # 테스트 데이터셋은 missing_mask 포함
         self.test_dataset = TrafficMultiSensorDataset(
-            test_df, seq_length=self.seq_length, allow_nan=False
+            test_df, seq_length=self.seq_length, allow_nan=False,
+            missing_mask=test_missing_mask
         )
         
-        # 스케일러 준비 및 적용
+        # 스케일러 준비 및 적용 (train_df 기준)
         self._prepare_scaler(train_df)
         self._apply_scaling(self.train_dataset, self.val_dataset, self.test_dataset)
         
@@ -390,6 +436,9 @@ class MultiSensorTrafficDataModule(L.LightningDataModule):
     
     def train_dataloader(self) -> DataLoader:
         """훈련용 DataLoader 반환."""
+        if self.train_dataset is None:
+            raise ValueError("Train dataset is not initialized. Call setup() first.")
+        
         if self.num_workers > 0:
             return DataLoader(
                 self.train_dataset,
@@ -409,6 +458,9 @@ class MultiSensorTrafficDataModule(L.LightningDataModule):
     
     def val_dataloader(self) -> DataLoader:
         """검증용 DataLoader 반환."""
+        if self.val_dataset is None:
+            raise ValueError("Validation dataset is not initialized. Call setup() first.")
+        
         if self.num_workers > 0:
             return DataLoader(
                 self.val_dataset,
@@ -427,7 +479,10 @@ class MultiSensorTrafficDataModule(L.LightningDataModule):
             )
     
     def test_dataloader(self) -> DataLoader:
-        """테스트용 DataLoader 반환."""
+        """테스트용 DataLoader 반환. missing 정보 포함 가능."""
+        if self.test_dataset is None:
+            raise ValueError("Test dataset is not initialized. Call setup() first.")
+        
         if self.num_workers > 0:
             return DataLoader(
                 self.test_dataset,
@@ -435,12 +490,12 @@ class MultiSensorTrafficDataModule(L.LightningDataModule):
                 shuffle=False,
                 num_workers=self.num_workers,
                 persistent_workers=True,
-                collate_fn=self.collate_fn,
+                collate_fn=self.test_collate_fn,
             )
         else:
             return DataLoader(
                 self.test_dataset,
                 batch_size=self.batch_size,
                 shuffle=False,
-                collate_fn=self.collate_fn,
+                collate_fn=self.test_collate_fn,
             )

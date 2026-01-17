@@ -12,6 +12,9 @@ TrafficDataType = Tuple[np.ndarray, np.ndarray, pd.DatetimeIndex, pd.Timestamp]
 TrafficMultiSensorDataType = Tuple[
     np.ndarray, np.ndarray, pd.DatetimeIndex, pd.Timestamp, str
 ]
+TrafficMultiSensorWithMissingDataType = Tuple[
+    np.ndarray, np.ndarray, pd.DatetimeIndex, pd.Timestamp, str, bool
+]
 
 
 class TrafficCoreDataset(Dataset):
@@ -124,6 +127,7 @@ class TrafficMultiSensorDataset(Dataset):
 
     DataFrame의 각 컬럼이 서로 다른 센서를 나타내는 경우 사용.
     각 샘플마다 센서 이름 정보도 함께 반환.
+    missing_mask가 제공되면 y값이 원래 결측치였는지 여부도 반환.
     """
 
     def __init__(
@@ -131,11 +135,13 @@ class TrafficMultiSensorDataset(Dataset):
         data: pd.DataFrame,
         seq_length: int = 24,
         allow_nan: bool = False,
+        missing_mask: Optional[pd.DataFrame] = None,
     ):
         super().__init__()
         self.data_df = data
         self.seq_length = seq_length
         self.sensor_names = list(data.columns)
+        self.missing_mask = missing_mask
 
         # 각 센서별로 TrafficDataset을 생성
         self.sensor_datasets: dict[str, TrafficDataset] = {}
@@ -167,5 +173,10 @@ class TrafficMultiSensorDataset(Dataset):
         sensor_dataset = self.sensor_datasets[sensor_name]
 
         x, y, x_time_indices, y_time_index = sensor_dataset[sensor_index]
+
+        # missing_mask가 있으면 y값이 원래 결측치였는지 확인
+        if self.missing_mask is not None:
+            y_is_missing = bool(self.missing_mask.loc[y_time_index, sensor_name])
+            return x, y, x_time_indices, y_time_index, sensor_name, y_is_missing
 
         return x, y, x_time_indices, y_time_index, sensor_name

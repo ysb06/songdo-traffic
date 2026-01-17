@@ -1,4 +1,5 @@
-from .metr_imc import TrafficData
+from .metr_imc.traffic_data import TrafficData
+from .metr_imc.traffic_data import MissingMasks
 from .metadata import Metadata
 from .adj_mx import AdjacencyMatrix
 from .distance_imc import DistancesImc

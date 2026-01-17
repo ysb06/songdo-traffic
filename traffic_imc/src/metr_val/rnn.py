@@ -8,12 +8,17 @@ from lightning.pytorch.loggers import WandbLogger
 from metr.datasets.rnn.datamodule import MultiSensorTrafficDataModule
 
 from .models.rnn.module import MultiSensorLSTMLightningModule
+from metr.utils import PathConfig
 
 
-def main(dataset_path: str = "./data/selected_small_v1/metr-imc.h5"):
-    data = MultiSensorTrafficDataModule(dataset_path)
+def main(path_config: PathConfig):
+    data = MultiSensorTrafficDataModule(
+        path_config.metr_imc_training_path,
+        path_config.metr_imc_test_path,
+        path_config.metr_imc_test_missing_path,
+    )
     data.setup()  # Setup을 먼저 호출하여 scaler 생성
-    
+
     model = MultiSensorLSTMLightningModule(scaler=data.scaler)
 
     output_dir = "./output/lstm"

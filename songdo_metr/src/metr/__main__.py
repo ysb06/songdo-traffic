@@ -1,6 +1,6 @@
 import logging
 import pickle
-from typing import List
+from typing import List, Tuple
 
 from metr.components.metr_imc.interpolation import Interpolator
 from metr.components.metr_imc.interpolation.mice import SpatialMICEInterpolator
@@ -18,35 +18,37 @@ logging.basicConfig(
     level=logging.INFO,
 )
 
-# # Generate Raw Datasets
-# generate_raw_dataset()
+# Generate Raw Datasets
+generate_raw_dataset()
 
-# # Generate Base Subset Datasets
+# Generate Base Subset Datasets (테스트 용)
 # generate_subset(
 #     target_data_start="2023-01-26 00:00:00",
 #     cluster_count=1,
 #     missing_rate_threshold=0.9,
 # )
 
-# Generate Final Subset Datasets with Data Correction
+# Generate Data Interpolation Subset
+def generate_interpolated_subset(key: str, interpolator: Interpolator):
+    subset_path_conf = PathConfig.from_yaml(f"../config_{key}.yaml")
+    interpolation_processors: List[Interpolator] = [
+        interpolator,
+    ]
+
+    generate_subset(
+        subset_path_conf=subset_path_conf,
+        target_data_start="2023-01-26 00:00:00",
+        cluster_count=1,
+        missing_rate_threshold=0.9,
+        interpolation_processors=interpolation_processors,
+    )
+
 raw_path_conf = PathConfig.from_yaml("../config.yaml")
-subset_path_conf = PathConfig.from_yaml("../config_bgcp.yaml")
 adj_mx = AdjacencyMatrix.import_from_pickle(raw_path_conf.adj_mx_path)
-
-outlier_processors: List[OutlierProcessor] = [
-    SimpleAbsoluteOutlierProcessor(threshold=3450),  # Example threshold
+interpolation_processors: List[Tuple[str, Interpolator]] = [
+    ("mice", SpatialMICEInterpolator(adj_mx)),
+    ("knn", SpatialKNNInterpolator(adj_mx)),
+    ("bgcp", BGCPInterpolator()),
 ]
-interpolation_processors: List[Interpolator] = [
-    # SpatialKNNInterpolator(adj_mx),
-    # SpatialMICEInterpolator(adj_mx),
-    BGCPInterpolator(),
-]
-
-generate_subset(
-    subset_path_conf=subset_path_conf,
-    target_data_start="2023-01-26 00:00:00",
-    cluster_count=1,
-    missing_rate_threshold=0.9,
-    outlier_processors=outlier_processors,
-    interpolation_processors=interpolation_processors,
-)
+for key, interpolator in interpolation_processors:
+    generate_interpolated_subset(key, interpolator)

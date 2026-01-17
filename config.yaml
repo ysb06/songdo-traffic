@@ -6,6 +6,11 @@ dataset:
   dir: "."
   filenames:
     metr_imc: "metr-imc.h5"
+    metr_imc_missing: "metr-imc-missing.h5"
+    metr_imc_training: "metr-imc-training.h5"
+    metr_imc_training_missing: "metr-imc-training-missing.h5"
+    metr_imc_test: "metr-imc-test.h5" 
+    metr_imc_test_missing: "metr-imc-test-missing.h5"
     sensor_ids: "metr_ids.txt"
     metadata: "metadata.h5"
     sensor_locations: "graph_sensor_locations.csv"
