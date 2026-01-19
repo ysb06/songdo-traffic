@@ -61,7 +61,7 @@ interpolation_processors: List[Tuple[str, Interpolator]] = [
     # ("knn", SpatialKNNInterpolator(base_adj_mx)),
     # ("bgcp", BGCPInterpolator()),
     # ("trmf", TRMFInterpolator()),
-    ("brits", BRITSInterpolator()),
+    # ("brits", BRITSInterpolator()),
     ("grin", GRINInterpolator(base_adj_mx_tensor)),
 ]
 for key, interpolator in interpolation_processors:

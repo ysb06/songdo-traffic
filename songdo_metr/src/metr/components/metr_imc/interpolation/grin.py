@@ -215,6 +215,7 @@ class GRINInterpolator(Interpolator):
         """
         # 원본 데이터 (NaN 포함)
         values = df.values.astype(np.float32)
+        values = values[..., np.newaxis] # (시간 × 센서 × 1)
         
         # 결측치 마스크 생성 (NaN인 곳이 True → 평가용 마스크)
         # tsl은 bool/uint8 선호
