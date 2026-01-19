@@ -29,7 +29,6 @@ from metr.utils import PathConfig
 logger = logging.getLogger(__name__)
 PATH_CONF = PathConfig.from_yaml("../config.yaml")
 PATH_CONF.create_directories()
-PATH_SUBSET_CONF = PathConfig.from_yaml("../config_subset.yaml")
 
 
 # Other Settings
@@ -107,7 +106,7 @@ def generate_raw_dataset():
 
 
 def generate_subset(
-    subset_path_conf: PathConfig = PATH_SUBSET_CONF,
+    subset_path_conf: PathConfig,
     target_nodelinks_path: Optional[str] = None,
     target_data_start: Optional[str] = None,
     target_data_end: Optional[str] = None,
