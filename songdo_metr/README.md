@@ -9,6 +9,10 @@ This project aims to collect traffic data and road network data for Incheon Metr
 This project provides a script that automates the process of downloading data from the original sources, including the Korean Standard Node-Link and Incheon City traffic data, and converting it into a usable dataset.
 
 ### Installing Requirements
+
+**주의**
+CUDA 환경에서 torch, torch_geometric 설치는 별도의 설치 과정이 필요
+
 #### Using PDM
 
 ```bash

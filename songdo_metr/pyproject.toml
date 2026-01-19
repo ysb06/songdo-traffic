@@ -23,6 +23,9 @@ dependencies = [
     "openpyxl>=3.1.5",
     "pypots>=1.1",
     "torch-spatiotemporal>=0.9.5",
+    "torch-geometric>=2.7.0",
+    "torch-sparse>=0.6.18",
+    "torch-scatter>=2.1.2",
 ]
 requires-python = ">=3.10"
 readme = "README.md"
@@ -31,6 +34,13 @@ license = {text = "MIT"}
 [build-system]
 requires = ["pdm-backend"]
 build-backend = "pdm.backend"
+
+[tool.uv.extra-build-dependencies]
+torch-sparse = ["torch"]
+torch-scatter = ["torch"]
+
+[tool.pdm.build]
+requires = ["torch"]
 
 [tool.pdm]
 distribution = true
