@@ -97,21 +97,34 @@ class DCRNNLightningModule(L.LightningModule):
         # Track batches seen for curriculum learning
         self.batches_seen = 0
         
+        # Flag to track if optimizer needs to be reconfigured after first forward pass
+        # DCGRUCell dynamically registers parameters during first forward pass
+        self._optimizer_reconfigured = False
+        
         # Metrics storage
         self.validation_outputs = []
         self.test_outputs = []
 
     def configure_optimizers(self):
-        """Configure optimizer with StepLR scheduler."""
+        """Configure optimizer with MultiStepLR scheduler.
+        
+        Note: DCGRUCell dynamically registers parameters during the first forward pass.
+        The optimizer will be reconfigured after the first training step to include
+        all dynamically registered parameters.
+        
+        Uses MultiStepLR with milestones [20, 30, 40, 50] and gamma 0.1 as in original DCRNN.
+        """
         optimizer = torch.optim.Adam(
             self.parameters(),
             lr=self.learning_rate,
             weight_decay=self.weight_decay,
+            eps=1e-8,  # DCRNN original uses epsilon=1e-8
         )
-        scheduler = torch.optim.lr_scheduler.StepLR(
+        # Original DCRNN uses MultiStepLR with milestones
+        scheduler = torch.optim.lr_scheduler.MultiStepLR(
             optimizer,
-            step_size=self.scheduler_step_size,
-            gamma=self.scheduler_gamma,
+            milestones=[20, 30, 40, 50],  # Standard DCRNN milestones
+            gamma=0.1,  # Reduce LR by 10x at each milestone
         )
         
         return {
@@ -143,13 +156,29 @@ class DCRNNLightningModule(L.LightningModule):
     def training_step(
         self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int
     ) -> torch.Tensor:
-        """Training step with curriculum learning support."""
+        """Training step with curriculum learning support.
+        
+        Note: DCGRUCell dynamically registers parameters during the first forward pass.
+        After the first batch, we need to reinitialize the optimizer to include these
+        new parameters. This is done by calling self.trainer.strategy.setup_optimizers().
+        """
         x, y = batch
         # x: (seq_len, batch_size, num_nodes * input_dim)
         # y: (horizon, batch_size, num_nodes * output_dim)
         
         # Forward pass with curriculum learning
         y_hat = self(x, y, self.batches_seen)
+        
+        # CRITICAL: After the first forward pass, DCGRUCell has dynamically registered
+        # its parameters. We need to reconfigure the optimizer to include them.
+        if self.batches_seen == 0 and not self._optimizer_reconfigured:
+            self._optimizer_reconfigured = True
+            # Reinitialize optimizers to include dynamically registered parameters
+            self.trainer.strategy.setup_optimizers(self.trainer)
+            self._logger.info(
+                f"Optimizer reconfigured with {sum(p.numel() for p in self.parameters() if p.requires_grad)} parameters"
+            )
+        
         self.batches_seen += 1
         
         # Calculate loss

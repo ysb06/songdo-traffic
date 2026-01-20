@@ -241,9 +241,9 @@ class STGCNLightningModule(L.LightningModule):
             * 100
         ) if nonzero_mask.any() else 0.0
 
-        self.log("test_mae", mae_scaled)
-        self.log("test_rmse", rmse_scaled)
-        self.log("test_mape", mape_scaled)
+        self.log("test_mae_scaled", mae_scaled)
+        self.log("test_rmse_scaled", rmse_scaled)
+        self.log("test_mape_scaled", float(mape_scaled))
 
         print(f"\nTest Results (Scaled, Excluding Interpolated):")
         print(f"  MAE:  {mae_scaled:.4f}")
@@ -273,9 +273,10 @@ class STGCNLightningModule(L.LightningModule):
                 )) * 100
             ) if nonzero_mask_unscaled.any() else 0.0
             
-            self.log("test_mae_unscaled", mae_unscaled)
-            self.log("test_rmse_unscaled", rmse_unscaled)
-            self.log("test_mape_unscaled", mape_unscaled)
+            # Log unscaled metrics as primary metrics
+            self.log("test_mae", mae_unscaled)
+            self.log("test_rmse", rmse_unscaled)
+            self.log("test_mape", float(mape_unscaled))
             
             print(f"\nTest Results (Original Scale, Excluding Interpolated):")
             print(f"  MAE:  {mae_unscaled:.4f}")

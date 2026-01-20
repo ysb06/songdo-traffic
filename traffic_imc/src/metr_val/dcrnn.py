@@ -37,7 +37,9 @@ def main():
     cl_decay_steps = 2000
     
     # Training parameters
-    learning_rate = 0.01
+    # Note: Original DCRNN uses lr=0.01 with MultiStepLR scheduler (milestones=[20,30,40,50])
+    # Lower learning rate helps with convergence stability
+    learning_rate = 0.001  # Changed from 0.01 - more stable for DCRNN
     weight_decay = 0.0
     max_epochs = 100
     
@@ -140,7 +142,7 @@ def main():
         callbacks=callbacks,
         log_every_n_steps=10,
         enable_progress_bar=True,
-        gradient_clip_val=5.0,  # DCRNN typically uses gradient clipping
+        gradient_clip_val=1.0,  # Original DCRNN uses max_grad_norm=1.0
     )
     
     # Train and test

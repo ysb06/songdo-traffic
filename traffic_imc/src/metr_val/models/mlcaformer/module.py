@@ -281,10 +281,10 @@ class MLCAFormerLightningModule(L.LightningModule):
                 * 100
             ) if non_zero_mask.any() else 0.0
             
-            # Log non-missing metrics with standard names
-            self.log("test_mae", mae_scaled)
-            self.log("test_rmse", rmse_scaled)
-            self.log("test_mape", mape_scaled)
+            # Log scaled metrics with _scaled suffix
+            self.log("test_mae_scaled", mae_scaled)
+            self.log("test_rmse_scaled", rmse_scaled)
+            self.log("test_mape_scaled", float(mape_scaled))
             
             print(f"\nTest Results (Scaled - Non-Missing Data Only):")
             print(f"MAE: {mae_scaled:.4f}")
@@ -315,7 +315,7 @@ class MLCAFormerLightningModule(L.LightningModule):
             print(f"RMSE: {rmse_unscaled_all:.4f}")
             print(f"MAPE: {mape_unscaled_all:.4f}%")
             
-            # Non-missing data metrics on original scale - log these
+            # Non-missing data metrics on original scale - log these as primary metrics
             if non_missing_mask.any():
                 y_true_unscaled_non_missing = y_true_unscaled_flat[non_missing_mask]
                 y_pred_unscaled_non_missing = y_pred_unscaled_flat[non_missing_mask]
@@ -329,10 +329,10 @@ class MLCAFormerLightningModule(L.LightningModule):
                     * 100
                 ) if non_zero_mask_unscaled.any() else 0.0
                 
-                # Log unscaled non-missing metrics with standard names
-                self.log("test_mae_unscaled", mae_unscaled)
-                self.log("test_rmse_unscaled", rmse_unscaled)
-                self.log("test_mape_unscaled", mape_unscaled)
+                # Log unscaled non-missing metrics as primary metrics
+                self.log("test_mae", mae_unscaled)
+                self.log("test_rmse", rmse_unscaled)
+                self.log("test_mape", float(mape_unscaled))
                 
                 print(f"\nTest Results (Original Scale - Non-Missing Data Only):")
                 print(f"MAE: {mae_unscaled:.4f}")

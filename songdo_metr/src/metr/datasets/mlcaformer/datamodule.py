@@ -8,7 +8,7 @@ from typing import Callable, List, Literal, Optional, Tuple
 import lightning as L
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -44,6 +44,7 @@ class MLCAFormerDataModule(L.LightningDataModule):
         collate_fn: Collate function for DataLoader (default: collate_fn)
         target_sensors: List of sensor IDs to use (default: None = all sensors)
         scale_method: Scaling method - "normal", "strict", or "none" (default: "normal")
+        normalizer: Normalizer type - "minmax" or "std" (default: "minmax")
     """
     
     def __init__(
@@ -61,6 +62,7 @@ class MLCAFormerDataModule(L.LightningDataModule):
         collate_fn: Callable = collate_fn,
         target_sensors: Optional[List[str]] = None,
         scale_method: Optional[Literal["normal", "strict", "none"]] = "normal",
+        normalizer: Literal["minmax", "std"] = "minmax",
     ):
         super().__init__()
         self.training_dataset_path = training_dataset_path
@@ -78,8 +80,9 @@ class MLCAFormerDataModule(L.LightningDataModule):
         self.collate_fn = collate_fn
         self.target_sensors = target_sensors
         self.scale_method = scale_method
+        self.normalizer = normalizer
         
-        self._scaler: Optional[MinMaxScaler] = None
+        self._scaler: Optional[MinMaxScaler | StandardScaler] = None
         
         # Dataset placeholders
         self.train_dataset: Optional[MLCAFormerDataset] = None
@@ -94,7 +97,7 @@ class MLCAFormerDataModule(L.LightningDataModule):
         self.sensor_ids: Optional[List[str]] = None
     
     @property
-    def scaler(self) -> Optional[MinMaxScaler]:
+    def scaler(self) -> Optional[MinMaxScaler | StandardScaler]:
         """Get the fitted scaler. Creates one if not exists."""
         if self.scale_method is None or self.scale_method == "none":
             return None
@@ -178,20 +181,29 @@ class MLCAFormerDataModule(L.LightningDataModule):
         
         if self.scale_method == "strict":
             # Use only actual training samples for fitting
-            temp_dataset = MLCAFormerDataset(
-                train_df,
-                in_steps=self.in_steps,
-                out_steps=self.out_steps,
-                steps_per_day=self.steps_per_day,
-            )
+            # Create temp dataset without steps_per_day if not needed (e.g., AGCRN)
+            dataset_kwargs = {
+                "in_steps": self.in_steps,
+                "out_steps": self.out_steps,
+            }
+            if hasattr(self, 'steps_per_day'):
+                dataset_kwargs["steps_per_day"] = self.steps_per_day
+            
+            temp_dataset = MLCAFormerDataset(train_df, **dataset_kwargs)
             ref_data = self._get_strict_scaler_data(temp_dataset)
         else:
             # Use all training period data (excluding NaN)
             ref_data = train_df.values.reshape(-1, 1)
             ref_data = ref_data[~np.isnan(ref_data).any(axis=1)]
         
-        logger.info(f"Fitting scaler with {len(ref_data)} data points using '{self.scale_method}' method")
-        self._scaler = MinMaxScaler(feature_range=(0, 1))
+        # Choose scaler based on normalizer type
+        if self.normalizer == "std":
+            logger.info(f"Fitting StandardScaler with {len(ref_data)} data points using '{self.scale_method}' method")
+            self._scaler = StandardScaler()
+        else:
+            logger.info(f"Fitting MinMaxScaler with {len(ref_data)} data points using '{self.scale_method}' method")
+            self._scaler = MinMaxScaler(feature_range=(0, 1))
+        
         self._scaler.fit(ref_data)
     
     def _get_strict_scaler_data(self, dataset: MLCAFormerDataset) -> np.ndarray:

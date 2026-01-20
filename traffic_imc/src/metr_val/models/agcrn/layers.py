@@ -128,12 +128,12 @@ class AGCRNCell(nn.Module):
         z_r = torch.sigmoid(self.gate(input_and_state, node_embeddings))
         z, r = torch.split(z_r, self.hidden_dim, dim=-1)
         
-        # Compute candidate hidden state
-        candidate = torch.cat((x, z * state), dim=-1)
+        # Compute candidate hidden state (r = reset gate)
+        candidate = torch.cat((x, r * state), dim=-1)
         hc = torch.tanh(self.update(candidate, node_embeddings))
         
-        # Compute new hidden state
-        h = r * state + (1 - r) * hc
+        # Compute new hidden state (z = update gate)
+        h = z * state + (1 - z) * hc
         
         return h
     
