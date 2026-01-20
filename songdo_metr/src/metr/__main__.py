@@ -28,12 +28,12 @@ logger = logging.getLogger(__name__)
 
 # Generate Base Subset Datasets (테스트 용)
 base_subset_path_conf = PathConfig.from_yaml("../config_base.yaml")
-generate_subset(
-    subset_path_conf=base_subset_path_conf,
-    target_data_start="2023-01-26 00:00:00",
-    cluster_count=1,
-    missing_rate_threshold=0.9,
-)
+# generate_subset(
+#     subset_path_conf=base_subset_path_conf,
+#     target_data_start="2023-01-26 00:00:00",
+#     cluster_count=1,
+#     missing_rate_threshold=0.9,
+# )
 
 
 # Generate Data Interpolation Subset

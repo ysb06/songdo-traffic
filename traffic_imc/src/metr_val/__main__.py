@@ -1,4 +1,4 @@
-from .stgcn import main
+from .mlcaformer import main
 from metr.utils import PathConfig
 
 if __name__ == "__main__":

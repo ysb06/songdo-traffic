@@ -9,12 +9,11 @@ from lightning.pytorch.loggers import WandbLogger
 from metr.datasets.mlcaformer import MLCAFormerDataModule
 
 from .models.mlcaformer import MLCAFormerLightningModule
+from metr.utils import PathConfig
 
 
-def main():
+def main(path_config: PathConfig):
     # Configuration
-    dataset_path = "./data/selected_small_v1/metr-imc_train.h5"
-    test_dataset_path = "./data/selected_small_v1/metr-imc_test.h5"
     output_dir = "./output/mlcaformer"
     
     # Data parameters

@@ -5,7 +5,7 @@ MLCAFormer requires input with temporal features (time-of-day, day-of-week)
 and processes all nodes simultaneously.
 """
 import logging
-from typing import Tuple
+from typing import Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -28,11 +28,15 @@ class MLCAFormerDataset(Dataset):
         in_steps: Number of input time steps (default: 12)
         out_steps: Number of output/prediction time steps (default: 12)
         steps_per_day: Number of time steps per day (default: 288 for 5-min intervals)
+        missing_mask: Optional boolean DataFrame or array of shape (time_steps, n_vertex)
+                     True indicates the value was originally missing (interpolated)
         
     Returns:
         x: Input tensor of shape (num_samples, in_steps, n_vertex, 3)
            where features are [traffic_value, time_of_day, day_of_week]
         y: Target tensor of shape (num_samples, out_steps, n_vertex, 1)
+        y_is_missing: (Optional) Boolean tensor of shape (out_steps, n_vertex) 
+                     - True if originally missing. Only returned when missing_mask is provided.
     """
     
     def __init__(
@@ -41,6 +45,7 @@ class MLCAFormerDataset(Dataset):
         in_steps: int = 12, 
         out_steps: int = 12,
         steps_per_day: int = 288,
+        missing_mask: Optional[Union[pd.DataFrame, np.ndarray]] = None,
     ):
         self.in_steps = in_steps
         self.out_steps = out_steps
@@ -51,6 +56,16 @@ class MLCAFormerDataset(Dataset):
         # Store original data for scaling
         self.data_values = data.values.astype(np.float32)  # (time_steps, n_vertex)
         self.scaled_data = self.data_values.copy()
+        
+        # Store missing mask if provided
+        self.has_missing_mask = missing_mask is not None
+        if missing_mask is not None:
+            if isinstance(missing_mask, pd.DataFrame):
+                self.missing_mask = missing_mask.values.astype(bool)
+            else:
+                self.missing_mask = missing_mask.astype(bool)
+        else:
+            self.missing_mask = None
         
         # Extract temporal features from DatetimeIndex
         self.tod = self._extract_tod(data.index)  # (time_steps,)
@@ -110,15 +125,20 @@ class MLCAFormerDataset(Dataset):
     def __len__(self) -> int:
         return len(self.valid_indices)
     
-    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
+    def __getitem__(self, idx: int) -> Union[Tuple[torch.Tensor, torch.Tensor], Tuple[torch.Tensor, torch.Tensor, torch.Tensor]]:
         """Get a single sample.
         
         Args:
             idx: Sample index
             
         Returns:
-            x: Input tensor of shape (in_steps, n_vertex, 3)
-            y: Target tensor of shape (out_steps, n_vertex, 1)
+            If missing_mask is not provided:
+                x: Input tensor of shape (in_steps, n_vertex, 3)
+                y: Target tensor of shape (out_steps, n_vertex, 1)
+            If missing_mask is provided:
+                x: Input tensor of shape (in_steps, n_vertex, 3)
+                y: Target tensor of shape (out_steps, n_vertex, 1)
+                y_is_missing: Boolean tensor of shape (out_steps, n_vertex)
         """
         t = self.valid_indices[idx]
         
@@ -137,6 +157,11 @@ class MLCAFormerDataset(Dataset):
         # Target: only traffic values
         y = np.zeros((self.out_steps, self.n_vertex, 1), dtype=np.float32)
         y[:, :, 0] = self.scaled_data[t + self.in_steps:t + self.in_steps + self.out_steps, :]
+        
+        if self.has_missing_mask:
+            # Extract missing mask for target window
+            y_missing = self.missing_mask[t + self.in_steps:t + self.in_steps + self.out_steps, :]
+            return torch.from_numpy(x), torch.from_numpy(y), torch.from_numpy(y_missing)
         
         return torch.from_numpy(x), torch.from_numpy(y)
     

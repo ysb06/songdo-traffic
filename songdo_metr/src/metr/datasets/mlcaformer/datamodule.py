@@ -13,8 +13,9 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from metr.components.metr_imc.traffic_data import TrafficData, get_raw
+from metr.components import MissingMasks
 
-from .dataloader import collate_fn
+from .dataloader import collate_fn, collate_fn_with_missing
 from .dataset import MLCAFormerDataset
 
 logger = logging.getLogger(__name__)
@@ -26,11 +27,14 @@ class MLCAFormerDataModule(L.LightningDataModule):
     This DataModule handles data loading, splitting, scaling, and DataLoader
     creation for the MLCAFormer model.
     
+    Training 데이터와 Test 데이터를 별도 파일에서 로드하며,
+    Training 데이터는 비율에 따라 train/validation으로 분할합니다.
+    
     Args:
-        dataset_path: Path to the HDF5 dataset file
-        training_period: Tuple of (start_datetime, end_datetime) for training
-        validation_period: Tuple of (start_datetime, end_datetime) for validation
-        test_period: Tuple of (start_datetime, end_datetime) for testing
+        training_dataset_path: Path to the training HDF5 dataset file
+        test_dataset_path: Path to the test HDF5 dataset file
+        test_missing_path: Path to the test missing mask HDF5 file
+        train_val_split: Train/Validation split ratio (default: 0.8 = 80% train, 20% val)
         in_steps: Number of input time steps (default: 12)
         out_steps: Number of output time steps (default: 12)
         steps_per_day: Number of time steps per day (default: 288)
@@ -44,10 +48,10 @@ class MLCAFormerDataModule(L.LightningDataModule):
     
     def __init__(
         self,
-        dataset_path: str,
-        training_period: Tuple[str, str] = ("2022-11-01 00:00:00", "2024-07-31 23:59:59"),
-        validation_period: Tuple[str, str] = ("2024-08-01 00:00:00", "2024-09-30 23:59:59"),
-        test_period: Tuple[str, str] = ("2024-10-01 00:00:00", "2024-10-31 23:59:59"),
+        training_dataset_path: str,
+        test_dataset_path: str,
+        test_missing_path: str,
+        train_val_split: float = 0.8,
         in_steps: int = 12,
         out_steps: int = 12,
         steps_per_day: int = 288,
@@ -59,10 +63,10 @@ class MLCAFormerDataModule(L.LightningDataModule):
         scale_method: Optional[Literal["normal", "strict", "none"]] = "normal",
     ):
         super().__init__()
-        self.dataset_path = dataset_path
-        self.training_period = training_period
-        self.validation_period = validation_period
-        self.test_period = test_period
+        self.training_dataset_path = training_dataset_path
+        self.test_dataset_path = test_dataset_path
+        self.test_missing_path = test_missing_path
+        self.train_val_split = train_val_split
         
         self.in_steps = in_steps
         self.out_steps = out_steps
@@ -82,6 +86,9 @@ class MLCAFormerDataModule(L.LightningDataModule):
         self.val_dataset: Optional[MLCAFormerDataset] = None
         self.test_dataset: Optional[MLCAFormerDataset] = None
         
+        # Missing mask for test data
+        self.test_missing_mask: Optional[pd.DataFrame] = None
+        
         # Metadata
         self.num_nodes: Optional[int] = None
         self.sensor_ids: Optional[List[str]] = None
@@ -94,19 +101,19 @@ class MLCAFormerDataModule(L.LightningDataModule):
         
         if self._scaler is None:
             logger.info("Scaler not found. Creating scaler from training data...")
-            train_df, _, _ = self._load_and_split_data()
+            train_df, _ = self._load_training_data()
             self._prepare_scaler(train_df)
         
         return self._scaler
     
-    def _load_and_split_data(self) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-        """Load data and split by periods.
+    def _load_training_data(self) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """Load training data and split into train/val.
         
         Returns:
-            Tuple of (train_df, val_df, test_df)
+            Tuple of (train_df, val_df)
         """
-        logger.info(f"Loading data from {self.dataset_path}")
-        raw = get_raw(self.dataset_path)
+        logger.info(f"Loading training data from {self.training_dataset_path}")
+        raw = get_raw(self.training_dataset_path)
         raw_df = raw.data
         
         # Filter target sensors if specified
@@ -114,14 +121,49 @@ class MLCAFormerDataModule(L.LightningDataModule):
             logger.info(f"Filtering to {len(self.target_sensors)} target sensors")
             raw_df = raw_df.loc[:, self.target_sensors]
         
-        # Split by periods
-        train_df = raw_df.loc[self.training_period[0]:self.training_period[1]]
-        val_df = raw_df.loc[self.validation_period[0]:self.validation_period[1]]
-        test_df = raw_df.loc[self.test_period[0]:self.test_period[1]]
+        # Split by ratio (time-ordered)
+        total_rows = len(raw_df)
+        split_idx = int(total_rows * self.train_val_split)
         
-        logger.info(f"Data split - Train: {len(train_df)}, Val: {len(val_df)}, Test: {len(test_df)}")
+        train_df = raw_df.iloc[:split_idx]
+        val_df = raw_df.iloc[split_idx:]
         
-        return train_df, val_df, test_df
+        logger.info(
+            f"Training data split - Train: {len(train_df)} rows "
+            f"({self.train_val_split * 100:.0f}%), "
+            f"Val: {len(val_df)} rows ({(1 - self.train_val_split) * 100:.0f}%)"
+        )
+        
+        return train_df, val_df
+    
+    def _load_test_data(self) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """Load test data and missing mask.
+        
+        Returns:
+            Tuple of (test_df, missing_mask_df)
+        """
+        logger.info(f"Loading test data from {self.test_dataset_path}")
+        raw = get_raw(self.test_dataset_path)
+        raw_df = raw.data
+        
+        # Load missing mask
+        logger.info(f"Loading test missing mask from {self.test_missing_path}")
+        missing_masks = MissingMasks.import_from_hdf(self.test_missing_path)
+        missing_mask_df = missing_masks.data
+        
+        # Filter target sensors if specified
+        if self.target_sensors is not None:
+            raw_df = raw_df.loc[:, self.target_sensors]
+            missing_mask_df = missing_mask_df.loc[:, self.target_sensors]
+        
+        # Align missing mask with test data
+        missing_mask_aligned = missing_mask_df.reindex(
+            index=raw_df.index, columns=raw_df.columns, fill_value=False
+        )
+        
+        logger.info(f"Test data loaded: {len(raw_df)} rows")
+        
+        return raw_df, missing_mask_aligned
     
     def _prepare_scaler(self, train_df: pd.DataFrame) -> None:
         """Prepare and fit the scaler on training data.
@@ -163,7 +205,8 @@ class MLCAFormerDataModule(L.LightningDataModule):
         """
         data_list = []
         for i in tqdm(range(len(dataset)), desc="Extracting scaler reference data"):
-            x, y = dataset[i]
+            item = dataset[i]
+            x, y = item[0], item[1]  # Handle both (x, y) and (x, y, missing) cases
             # Only traffic values (first channel of x, all of y)
             data_list.append(x[:, :, 0].numpy().flatten())
             data_list.append(y[:, :, 0].numpy().flatten())
@@ -195,8 +238,12 @@ class MLCAFormerDataModule(L.LightningDataModule):
         """
         logger.info(f"Setting up MLCAFormer data for stage: {stage}")
         
-        # Load and split data
-        train_df, val_df, test_df = self._load_and_split_data()
+        # Load training data and split into train/val
+        train_df, val_df = self._load_training_data()
+        
+        # Load test data and missing mask
+        test_df, test_missing_mask = self._load_test_data()
+        self.test_missing_mask = test_missing_mask
         
         # Store metadata
         self.num_nodes = train_df.shape[1]
@@ -226,6 +273,7 @@ class MLCAFormerDataModule(L.LightningDataModule):
             in_steps=self.in_steps,
             out_steps=self.out_steps,
             steps_per_day=self.steps_per_day,
+            missing_mask=test_missing_mask,
         )
         
         # Prepare and apply scaling
@@ -270,14 +318,14 @@ class MLCAFormerDataModule(L.LightningDataModule):
         return DataLoader(self.val_dataset, **kwargs)
     
     def test_dataloader(self) -> DataLoader:
-        """Create test DataLoader."""
+        """Create test DataLoader with missing mask support."""
         if self.test_dataset is None:
             raise RuntimeError("test_dataset is None. Call setup() first.")
         
         kwargs = {
             "batch_size": self.batch_size,
             "shuffle": False,
-            "collate_fn": self.collate_fn,
+            "collate_fn": collate_fn_with_missing,  # Use collate with missing mask
         }
         
         if self.num_workers > 0:
