@@ -188,10 +188,10 @@ class MLCAFormerLightningModule(L.LightningModule):
         return loss
 
     def test_step(
-        self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int
+        self, batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor], batch_idx: int
     ) -> torch.Tensor:
-        """Test step"""
-        x, y = batch
+        """Test step with missing mask support"""
+        x, y, y_is_missing = batch
         y_hat: torch.Tensor = self(x)
 
         # MLCAFormer output: (batch, out_steps, num_nodes, output_dim)
@@ -208,6 +208,7 @@ class MLCAFormerLightningModule(L.LightningModule):
             {
                 "y_true": y.cpu().numpy(),
                 "y_pred": y_hat.cpu().numpy(),
+                "y_is_missing": y_is_missing.cpu().numpy(),
                 "loss": loss.item(),
             }
         )
@@ -243,54 +244,100 @@ class MLCAFormerLightningModule(L.LightningModule):
         # Concatenate all predictions and targets
         y_true = np.concatenate([x["y_true"] for x in self.test_outputs], axis=0)
         y_pred = np.concatenate([x["y_pred"] for x in self.test_outputs], axis=0)
+        y_is_missing = np.concatenate([x["y_is_missing"] for x in self.test_outputs], axis=0)
 
-        # Calculate metrics on scaled data
-        mae_scaled = mean_absolute_error(y_true.flatten(), y_pred.flatten())
-        rmse_scaled = np.sqrt(mean_squared_error(y_true.flatten(), y_pred.flatten()))
+        # Calculate metrics on scaled data (all data) - print only
+        mae_scaled_all = mean_absolute_error(y_true.flatten(), y_pred.flatten())
+        rmse_scaled_all = np.sqrt(mean_squared_error(y_true.flatten(), y_pred.flatten()))
 
         # MAPE with zero-division handling
         y_true_flat = y_true.flatten()
         y_pred_flat = y_pred.flatten()
-        mask = y_true_flat != 0
-        mape_scaled = (
-            np.mean(np.abs((y_true_flat[mask] - y_pred_flat[mask]) / y_true_flat[mask]))
+        mask_all = y_true_flat != 0
+        mape_scaled_all = (
+            np.mean(np.abs((y_true_flat[mask_all] - y_pred_flat[mask_all]) / y_true_flat[mask_all]))
             * 100
-        ) if mask.any() else 0.0
+        ) if mask_all.any() else 0.0
 
-        self.log("test_mae", mae_scaled)
-        self.log("test_rmse", rmse_scaled)
-        self.log("test_mape", mape_scaled)
-
-        print(f"\nTest Results (Scaled):")
-        print(f"MAE: {mae_scaled:.4f}")
-        print(f"RMSE: {rmse_scaled:.4f}")
-        print(f"MAPE: {mape_scaled:.4f}%")
+        print(f"\nTest Results (Scaled - All Data):")
+        print(f"MAE: {mae_scaled_all:.4f}")
+        print(f"RMSE: {rmse_scaled_all:.4f}")
+        print(f"MAPE: {mape_scaled_all:.4f}%")
+        
+        # Calculate metrics on non-missing (original) data only - log these
+        y_is_missing_flat = y_is_missing.flatten()
+        non_missing_mask = ~y_is_missing_flat
+        
+        if non_missing_mask.any():
+            y_true_non_missing = y_true_flat[non_missing_mask]
+            y_pred_non_missing = y_pred_flat[non_missing_mask]
+            
+            mae_scaled = mean_absolute_error(y_true_non_missing, y_pred_non_missing)
+            rmse_scaled = np.sqrt(mean_squared_error(y_true_non_missing, y_pred_non_missing))
+            
+            non_zero_mask = y_true_non_missing != 0
+            mape_scaled = (
+                np.mean(np.abs((y_true_non_missing[non_zero_mask] - y_pred_non_missing[non_zero_mask]) / y_true_non_missing[non_zero_mask]))
+                * 100
+            ) if non_zero_mask.any() else 0.0
+            
+            # Log non-missing metrics with standard names
+            self.log("test_mae", mae_scaled)
+            self.log("test_rmse", rmse_scaled)
+            self.log("test_mape", mape_scaled)
+            
+            print(f"\nTest Results (Scaled - Non-Missing Data Only):")
+            print(f"MAE: {mae_scaled:.4f}")
+            print(f"RMSE: {rmse_scaled:.4f}")
+            print(f"MAPE: {mape_scaled:.4f}%")
+            print(f"Non-missing ratio: {non_missing_mask.sum() / len(y_is_missing_flat) * 100:.2f}%")
         
         # Calculate unscaled metrics if scaler is provided
         if self.scaler is not None:
             y_true_unscaled = self._inverse_transform(y_true)
             y_pred_unscaled = self._inverse_transform(y_pred)
             
-            mae_unscaled = mean_absolute_error(y_true_unscaled.flatten(), y_pred_unscaled.flatten())
-            rmse_unscaled = np.sqrt(mean_squared_error(y_true_unscaled.flatten(), y_pred_unscaled.flatten()))
+            # All data metrics (unscaled) - print only
+            mae_unscaled_all = mean_absolute_error(y_true_unscaled.flatten(), y_pred_unscaled.flatten())
+            rmse_unscaled_all = np.sqrt(mean_squared_error(y_true_unscaled.flatten(), y_pred_unscaled.flatten()))
             
             # MAPE with zero-division handling
             y_true_unscaled_flat = y_true_unscaled.flatten()
             y_pred_unscaled_flat = y_pred_unscaled.flatten()
-            mask_unscaled = y_true_unscaled_flat != 0
-            mape_unscaled = (
-                np.mean(np.abs((y_true_unscaled_flat[mask_unscaled] - y_pred_unscaled_flat[mask_unscaled]) / y_true_unscaled_flat[mask_unscaled]))
+            mask_unscaled_all = y_true_unscaled_flat != 0
+            mape_unscaled_all = (
+                np.mean(np.abs((y_true_unscaled_flat[mask_unscaled_all] - y_pred_unscaled_flat[mask_unscaled_all]) / y_true_unscaled_flat[mask_unscaled_all]))
                 * 100
-            ) if mask_unscaled.any() else 0.0
+            ) if mask_unscaled_all.any() else 0.0
             
-            self.log("test_mae_unscaled", mae_unscaled)
-            self.log("test_rmse_unscaled", rmse_unscaled)
-            self.log("test_mape_unscaled", mape_unscaled)
+            print(f"\nTest Results (Original Scale - All Data):")
+            print(f"MAE: {mae_unscaled_all:.4f}")
+            print(f"RMSE: {rmse_unscaled_all:.4f}")
+            print(f"MAPE: {mape_unscaled_all:.4f}%")
             
-            print(f"\nTest Results (Original Scale):")
-            print(f"MAE: {mae_unscaled:.4f}")
-            print(f"RMSE: {rmse_unscaled:.4f}")
-            print(f"MAPE: {mape_unscaled:.4f}%")
+            # Non-missing data metrics on original scale - log these
+            if non_missing_mask.any():
+                y_true_unscaled_non_missing = y_true_unscaled_flat[non_missing_mask]
+                y_pred_unscaled_non_missing = y_pred_unscaled_flat[non_missing_mask]
+                
+                mae_unscaled = mean_absolute_error(y_true_unscaled_non_missing, y_pred_unscaled_non_missing)
+                rmse_unscaled = np.sqrt(mean_squared_error(y_true_unscaled_non_missing, y_pred_unscaled_non_missing))
+                
+                non_zero_mask_unscaled = y_true_unscaled_non_missing != 0
+                mape_unscaled = (
+                    np.mean(np.abs((y_true_unscaled_non_missing[non_zero_mask_unscaled] - y_pred_unscaled_non_missing[non_zero_mask_unscaled]) / y_true_unscaled_non_missing[non_zero_mask_unscaled]))
+                    * 100
+                ) if non_zero_mask_unscaled.any() else 0.0
+                
+                # Log unscaled non-missing metrics with standard names
+                self.log("test_mae_unscaled", mae_unscaled)
+                self.log("test_rmse_unscaled", rmse_unscaled)
+                self.log("test_mape_unscaled", mape_unscaled)
+                
+                print(f"\nTest Results (Original Scale - Non-Missing Data Only):")
+                print(f"MAE: {mae_unscaled:.4f}")
+                print(f"RMSE: {rmse_unscaled:.4f}")
+                print(f"MAPE: {mape_unscaled:.4f}%")
 
         # Clear outputs
         self.test_outputs.clear()

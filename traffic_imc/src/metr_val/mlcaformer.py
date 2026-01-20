@@ -47,15 +47,13 @@ def main(path_config: PathConfig):
     # Initialize data module
     print("Creating MLCAFormer data module...")
     data = MLCAFormerDataModule(
-        dataset_path=dataset_path,
-        training_period=("2022-11-01 00:00:00", "2024-07-31 23:59:59"),
-        validation_period=("2024-08-01 00:00:00", "2024-09-30 23:59:59"),
-        test_period=("2024-10-01 00:00:00", "2024-10-31 23:59:59"),
+        training_dataset_path=path_config.metr_imc_training_path,
+        test_dataset_path=path_config.metr_imc_test_path,
+        test_missing_path=path_config.metr_imc_test_missing_path,
         in_steps=in_steps,
         out_steps=out_steps,
         steps_per_day=steps_per_day,
         batch_size=batch_size,
-        num_workers=4,
         shuffle_training=True,
         scale_method="normal",
     )
@@ -63,6 +61,10 @@ def main(path_config: PathConfig):
     # Setup data to get num_nodes
     print("Setting up data module...")
     data.setup()
+    
+    if data.num_nodes is None:
+        raise ValueError("num_nodes is None after setup. Check if data is loaded correctly.")
+    
     num_nodes = data.num_nodes
     scaler = data.scaler  # Get scaler for inverse transform
     print(f"Number of nodes (sensors): {num_nodes}")
@@ -92,7 +94,9 @@ def main(path_config: PathConfig):
     )
     
     # Setup logger and callbacks
-    wandb_logger = WandbLogger(project="Traffic-IMC-MLCAFormer", log_model="all")
+    wandb_logger = WandbLogger(
+        name="MLCAFormer-MICE-00", project="IMC-Traffic", log_model="all"
+    )
     
     callbacks = [
         EarlyStopping(
