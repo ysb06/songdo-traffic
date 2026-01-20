@@ -12,7 +12,7 @@ from .models.mlcaformer import MLCAFormerLightningModule
 from metr.utils import PathConfig
 
 
-def main(path_config: PathConfig):
+def main(name_key: str, path_config: PathConfig, code: int = 0):
     # Configuration
     output_dir = "./output/mlcaformer"
     
@@ -95,7 +95,7 @@ def main(path_config: PathConfig):
     
     # Setup logger and callbacks
     wandb_logger = WandbLogger(
-        name="MLCAFormer-MICE-00", project="IMC-Traffic", log_model="all"
+        name=f"MLCAFormer-{name_key}-{code:02d}", project="IMC-Traffic", log_model="all"
     )
     
     callbacks = [

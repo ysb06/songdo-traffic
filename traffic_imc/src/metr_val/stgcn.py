@@ -19,7 +19,7 @@ from .models.stgcn.module import STGCNLightningModule
 from .models.stgcn.utils import prepare_gso_for_model
 
 
-def main(path_config: PathConfig):
+def main(name_key: str, path_config: PathConfig, code: int = 0):
     # Configuration
     output_dir = "./output/stgcn"
 
@@ -91,7 +91,7 @@ def main(path_config: PathConfig):
 
     # Setup logger and callbacks
     wandb_logger = WandbLogger(
-        name="STGCN-MICE-00", project="IMC-Traffic", log_model="all"
+        name=f"STGCN-{name_key}-{code:02d}", project="IMC-Traffic", log_model="all"
     )
 
     callbacks = [
