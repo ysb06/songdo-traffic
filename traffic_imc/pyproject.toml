@@ -32,3 +32,8 @@ copy-stgcn = "python scripts/post_update.py"
 dev = [
     "-e file:///${PROJECT_ROOT}/../songdo_metr#egg=songdo-metr",
 ]
+
+# [[tool.pdm.source]]
+# type = "find_links"
+# url = "https://data.pyg.org/whl/torch-2.8.0+cu128.html"
+# name = "pyg"

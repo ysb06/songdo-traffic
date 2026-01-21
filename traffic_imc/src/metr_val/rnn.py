@@ -34,7 +34,7 @@ def main(name_key: str, path_config: PathConfig, code: int = 0):
     )
 
     trainer = Trainer(
-        max_epochs=100,
+        max_epochs=20,
         accelerator="auto",
         devices="auto",
         default_root_dir=output_dir,
@@ -50,6 +50,7 @@ def main(name_key: str, path_config: PathConfig, code: int = 0):
             ),
             LearningRateMonitor(logging_interval="step"),
         ],
+        precision="16-mixed"
     )
     trainer.fit(model, data)
     trainer.test(model, data)

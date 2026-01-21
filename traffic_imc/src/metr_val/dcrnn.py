@@ -49,7 +49,7 @@ def main(name_key: str, path_config: PathConfig, code: int = 0):
     # Lower learning rate helps with convergence stability
     learning_rate = 0.001  # Changed from 0.01 - more stable for DCRNN
     weight_decay = 0.0
-    max_epochs = 100
+    max_epochs = 30
     
     # Device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -145,6 +145,7 @@ def main(name_key: str, path_config: PathConfig, code: int = 0):
         log_every_n_steps=10,
         enable_progress_bar=True,
         gradient_clip_val=1.0,  # Original DCRNN uses max_grad_norm=1.0
+        precision="16-mixed"
     )
     
     # Train and test

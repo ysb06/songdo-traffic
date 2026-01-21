@@ -122,6 +122,7 @@ def main(name_key: str, path_config: PathConfig, code: int = 0):
         callbacks=callbacks,
         log_every_n_steps=10,
         enable_progress_bar=True,
+        precision="16-mixed"
     )
 
     # Train and test

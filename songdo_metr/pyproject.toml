@@ -16,7 +16,7 @@ dependencies = [
     "shapely>=2.0.6",
     "networkx>=3.4",
     "requests>=2.32.3",
-    "torch>=2",
+    "torch==2.8.0",
     "tables>=3.10.1",
     "lightning>=2.5.1",
     "holidays>=0.74",
@@ -51,3 +51,8 @@ test = [
     "pytest>=8.3.3",
     "seaborn>=0.13.2",
 ]
+
+# [[tool.pdm.source]]
+# type = "find_links"
+# url = "https://data.pyg.org/whl/torch-2.8.0+cu128.html"
+# name = "pyg"

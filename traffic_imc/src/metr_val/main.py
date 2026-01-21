@@ -5,7 +5,7 @@ from .agcrn import main as agcrn_main
 from .rnn import main as lstm_main
 from metr.utils import PathConfig
 
-if __name__ == "__main__":
+def sequential_main():
     # path_config = PathConfig.from_yaml("../config_knn.yaml")
     # mlcaformer_main("KNN", path_config, code=0)
     data_list = [

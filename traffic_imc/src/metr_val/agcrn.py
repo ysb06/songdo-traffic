@@ -144,6 +144,7 @@ def main(name_key: str, path_config: PathConfig, code: int = 0):
         log_every_n_steps=10,
         enable_progress_bar=True,
         gradient_clip_val=5.0,  # AGCRN uses gradient clipping
+        precision="16-mixed"
     )
 
     # ==========================================================================
