@@ -48,6 +48,46 @@ def collate_fn(
     return x_batch, y_batch
 
 
+def collate_fn_with_missing(
+    batch: List[Tuple[torch.Tensor, torch.Tensor, torch.Tensor]]
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Collate function for DCRNN DataLoader with missing mask support.
+
+    Args:
+        batch: List of tuples (x, y, y_is_missing) where:
+            - x: torch.Tensor of shape (seq_len, num_nodes, input_dim)
+            - y: torch.Tensor of shape (horizon, num_nodes, output_dim)
+            - y_is_missing: torch.Tensor of shape (horizon, num_nodes)
+
+    Returns:
+        Tuple of:
+            - x_batch: torch.Tensor of shape (seq_len, batch_size, num_nodes * input_dim)
+            - y_batch: torch.Tensor of shape (horizon, batch_size, num_nodes * output_dim)
+            - y_missing_batch: torch.Tensor of shape (horizon, batch_size, num_nodes)
+    """
+    x_list, y_list, missing_list = zip(*batch)
+
+    x_stacked = torch.stack(x_list, dim=0)
+    y_stacked = torch.stack(y_list, dim=0)
+    missing_stacked = torch.stack(missing_list, dim=0)
+
+    batch_size = x_stacked.size(0)
+    seq_len = x_stacked.size(1)
+    num_nodes = x_stacked.size(2)
+    input_dim = x_stacked.size(3)
+    horizon = y_stacked.size(1)
+    output_dim = y_stacked.size(3)
+
+    # Reshape x and y to time-first format
+    x_batch = x_stacked.permute(1, 0, 2, 3).reshape(seq_len, batch_size, num_nodes * input_dim)
+    y_batch = y_stacked.permute(1, 0, 2, 3).reshape(horizon, batch_size, num_nodes * output_dim)
+    
+    # Reshape missing mask: (batch_size, horizon, num_nodes) -> (horizon, batch_size, num_nodes)
+    y_missing_batch = missing_stacked.permute(1, 0, 2)
+
+    return x_batch, y_batch, y_missing_batch
+
+
 def collate_fn_with_metadata(
     batch: List[Tuple[torch.Tensor, torch.Tensor]]
 ) -> Tuple[torch.Tensor, torch.Tensor, dict]:

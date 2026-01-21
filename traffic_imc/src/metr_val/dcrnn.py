@@ -11,14 +11,22 @@ from lightning.pytorch.callbacks import (
     ModelCheckpoint,
 )
 from lightning.pytorch.loggers import WandbLogger
-from metr.datasets.dcrnn import DCRNNDataModule
+from metr.components.adj_mx import AdjacencyMatrix
+from metr.datasets.dcrnn import DCRNNSplitDataModule
+from metr.utils import PathConfig
 
 from .models.dcrnn import DCRNNLightningModule
 
 
-def main():
+def main(name_key: str, path_config: PathConfig, code: int = 0):
+    """Main training function for DCRNN.
+    
+    Args:
+        name_key: Name key for WandB logging (e.g., 'KNN', 'MICE')
+        path_config: PathConfig instance with dataset paths
+        code: Run code number for identification
+    """
     # Configuration
-    data_dir = "./data/selected_small_v1"
     output_dir = "./output/dcrnn"
     
     # Data parameters
@@ -48,10 +56,18 @@ def main():
     device = torch.device("mps") if torch.backends.mps.is_available() else device
     print(f"Using device: {device}")
     
+    # Load adjacency matrix
+    print("Loading adjacency matrix...")
+    adj_mx_obj = AdjacencyMatrix.import_from_pickle(path_config.adj_mx_path)
+    adj_mx = adj_mx_obj.adj_mx
+    
     # Initialize data module
     print("Creating data module...")
-    data = DCRNNDataModule(
-        dataset_dir_path=data_dir,
+    data = DCRNNSplitDataModule(
+        training_data_path=path_config.metr_imc_training_path,
+        test_data_path=path_config.metr_imc_test_path,
+        test_missing_path=path_config.metr_imc_test_missing_path,
+        adj_mx_path=path_config.adj_mx_path,
         seq_len=seq_len,
         horizon=horizon,
         batch_size=batch_size,
@@ -64,9 +80,8 @@ def main():
     
     # Setup data module to get adjacency matrix and other properties
     print("Setting up data module...")
-    data.setup()
+    data.setup(stage="fit")
     
-    adj_mx = data.adj_mx
     num_nodes = data.num_nodes
     input_dim = data.input_dim
     output_dim = data.output_dim
@@ -98,20 +113,7 @@ def main():
     
     # Setup logger and callbacks
     wandb_logger = WandbLogger(
-        project="Traffic-IMC-DCRNN",
-        log_model="all",
-        config={
-            "seq_len": seq_len,
-            "horizon": horizon,
-            "num_nodes": num_nodes,
-            "input_dim": input_dim,
-            "rnn_units": rnn_units,
-            "num_rnn_layers": num_rnn_layers,
-            "max_diffusion_step": max_diffusion_step,
-            "filter_type": filter_type,
-            "learning_rate": learning_rate,
-            "batch_size": batch_size,
-        },
+        name=f"DCRNN-{name_key}-{code:02d}", project="IMC-Traffic", log_model="all"
     )
     
     callbacks = [
@@ -160,7 +162,3 @@ def main():
     print("Training and testing completed!")
     print(f"Best checkpoint: {callbacks[1].best_model_path}")
     print("=" * 60)
-
-
-if __name__ == "__main__":
-    main()

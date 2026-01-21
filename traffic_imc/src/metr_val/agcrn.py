@@ -45,7 +45,7 @@ def main(name_key: str, path_config: PathConfig, code: int = 0):
     scheduler_step_size = 5
     scheduler_gamma = 0.7
     max_epochs = 100
-    loss_func = "mae"  # 'mae' or 'mse'
+    loss_func = "mse"  # 'mae' or 'mse' (use 'mse' for consistency with other models)
 
     # ==========================================================================
     # Device setup

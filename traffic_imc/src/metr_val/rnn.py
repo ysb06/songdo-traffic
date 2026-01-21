@@ -11,7 +11,14 @@ from .models.rnn.module import MultiSensorLSTMLightningModule
 from metr.utils import PathConfig
 
 
-def main(path_config: PathConfig):
+def main(name_key: str, path_config: PathConfig, code: int = 0):
+    """Main training function for LSTM.
+    
+    Args:
+        name_key: Name key for WandB logging (e.g., 'KNN', 'MICE')
+        path_config: PathConfig instance with dataset paths
+        code: Run code number for identification
+    """
     data = MultiSensorTrafficDataModule(
         path_config.metr_imc_training_path,
         path_config.metr_imc_test_path,
@@ -23,7 +30,7 @@ def main(path_config: PathConfig):
 
     output_dir = "./output/lstm"
     wandb_logger = WandbLogger(
-        name="LSTM-MICE-00", project="IMC-Traffic", log_model="all"
+        name=f"LSTM-{name_key}-{code:02d}", project="IMC-Traffic", log_model="all"
     )
 
     trainer = Trainer(

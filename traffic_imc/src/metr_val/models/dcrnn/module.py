@@ -216,10 +216,17 @@ class DCRNNLightningModule(L.LightningModule):
         return loss
 
     def test_step(
-        self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int
+        self, batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor], batch_idx: int
     ) -> torch.Tensor:
-        """Test step."""
-        x, y = batch
+        """Test step with missing mask support.
+        
+        Args:
+            batch: Tuple of (x, y, y_is_missing) where:
+                - x: (seq_len, batch_size, num_nodes * input_dim)
+                - y: (horizon, batch_size, num_nodes * output_dim)
+                - y_is_missing: (horizon, batch_size, num_nodes)
+        """
+        x, y, y_is_missing = batch
         
         # Forward pass
         y_hat = self(x)
@@ -228,12 +235,15 @@ class DCRNNLightningModule(L.LightningModule):
         loss = self.criterion(y_hat, y)
         
         # Store outputs for epoch-end metrics
+        # Reshape from (horizon, batch, num_nodes * output_dim) to (batch, horizon, num_nodes)
         y_np = y.permute(1, 0, 2).cpu().numpy()
         y_hat_np = y_hat.permute(1, 0, 2).cpu().numpy()
+        y_missing_np = y_is_missing.permute(1, 0, 2).cpu().numpy()
         
         self.test_outputs.append({
             "y_true": y_np,
             "y_pred": y_hat_np,
+            "y_is_missing": y_missing_np,
             "loss": loss.item(),
         })
         
@@ -272,6 +282,7 @@ class DCRNNLightningModule(L.LightningModule):
         """Calculate test metrics at the end of epoch.
         
         Metrics are computed on the original (unscaled) data using inverse transform.
+        Only non-missing (original) data points are used for evaluation.
         """
         if len(self.test_outputs) == 0:
             return
@@ -279,54 +290,82 @@ class DCRNNLightningModule(L.LightningModule):
         # Concatenate all predictions and targets
         y_true = np.concatenate([x["y_true"] for x in self.test_outputs], axis=0)
         y_pred = np.concatenate([x["y_pred"] for x in self.test_outputs], axis=0)
+        y_is_missing = np.concatenate([x["y_is_missing"] for x in self.test_outputs], axis=0)
         
-        # Inverse transform to get original scale values
-        if self.scaler is not None:
-            # Store original shapes
-            original_shape = y_true.shape
-            
-            # Flatten, inverse transform, and reshape back
-            y_true_flat = y_true.reshape(-1, 1)
-            y_pred_flat = y_pred.reshape(-1, 1)
-            
-            y_true_unscaled = self.scaler.inverse_transform(y_true_flat).reshape(original_shape)
-            y_pred_unscaled = self.scaler.inverse_transform(y_pred_flat).reshape(original_shape)
-        else:
-            # No scaler provided, use original values
-            y_true_unscaled = y_true
-            y_pred_unscaled = y_pred
+        # Create mask for non-missing (original) data
+        y_true_flat = y_true.flatten()
+        y_pred_flat = y_pred.flatten()
+        y_is_missing_flat = y_is_missing.flatten()
+        non_missing_mask = ~y_is_missing_flat
         
-        # Calculate metrics on unscaled (original) data
-        mae = mean_absolute_error(y_true_unscaled.flatten(), y_pred_unscaled.flatten())
-        rmse = np.sqrt(mean_squared_error(y_true_unscaled.flatten(), y_pred_unscaled.flatten()))
+        # Calculate statistics
+        total_points = len(y_true_flat)
+        non_missing_points = non_missing_mask.sum()
+        missing_points = total_points - non_missing_points
         
-        # MAPE with zero-division handling
-        y_true_flat = y_true_unscaled.flatten()
-        y_pred_flat = y_pred_unscaled.flatten()
-        mask = y_true_flat != 0
-        mape = (
-            np.mean(np.abs((y_true_flat[mask] - y_pred_flat[mask]) / y_true_flat[mask])) * 100
-            if mask.any()
+        print(f"\nTest Data Statistics:")
+        print(f"  Total points: {total_points}")
+        print(f"  Non-missing (original) points: {non_missing_points} ({non_missing_points/total_points*100:.1f}%)")
+        print(f"  Missing (interpolated) points: {missing_points} ({missing_points/total_points*100:.1f}%)")
+        
+        # Calculate scaled metrics on non-missing data
+        y_true_scaled_valid = y_true_flat[non_missing_mask]
+        y_pred_scaled_valid = y_pred_flat[non_missing_mask]
+        
+        mae_scaled = mean_absolute_error(y_true_scaled_valid, y_pred_scaled_valid)
+        rmse_scaled = np.sqrt(mean_squared_error(y_true_scaled_valid, y_pred_scaled_valid))
+        
+        non_zero_mask_scaled = y_true_scaled_valid != 0
+        mape_scaled = (
+            np.mean(np.abs((y_true_scaled_valid[non_zero_mask_scaled] - y_pred_scaled_valid[non_zero_mask_scaled]) / y_true_scaled_valid[non_zero_mask_scaled])) * 100
+            if non_zero_mask_scaled.any()
             else 0.0
         )
         
+        # Log scaled metrics
+        self.log("test_mae_scaled", mae_scaled)
+        self.log("test_rmse_scaled", rmse_scaled)
+        self.log("test_mape_scaled", float(mape_scaled))
+        
+        print(f"\nTest Results (Scaled - Non-Missing Only):")
+        print(f"  MAE:  {mae_scaled:.4f}")
+        print(f"  RMSE: {rmse_scaled:.4f}")
+        print(f"  MAPE: {mape_scaled:.4f}%")
+        
+        # Inverse transform to get original scale values
+        if self.scaler is not None:
+            original_shape = y_true.shape
+            y_true_unscaled = self.scaler.inverse_transform(y_true_flat.reshape(-1, 1)).flatten()
+            y_pred_unscaled = self.scaler.inverse_transform(y_pred_flat.reshape(-1, 1)).flatten()
+        else:
+            y_true_unscaled = y_true_flat
+            y_pred_unscaled = y_pred_flat
+        
+        # Filter to non-missing data only
+        y_true_valid = y_true_unscaled[non_missing_mask]
+        y_pred_valid = y_pred_unscaled[non_missing_mask]
+        
+        # Calculate metrics on unscaled (original) data, non-missing only
+        mae = mean_absolute_error(y_true_valid, y_pred_valid)
+        rmse = np.sqrt(mean_squared_error(y_true_valid, y_pred_valid))
+        
+        # MAPE with zero-division handling
+        non_zero_mask = y_true_valid != 0
+        mape = (
+            np.mean(np.abs((y_true_valid[non_zero_mask] - y_pred_valid[non_zero_mask]) / y_true_valid[non_zero_mask])) * 100
+            if non_zero_mask.any()
+            else 0.0
+        )
+        
+        # Log unscaled metrics as primary metrics
         self.log("test_mae", mae)
         self.log("test_rmse", rmse)
         self.log("test_mape", float(mape))
         
-        # Calculate metrics for different horizons
-        print("\nTest Results (Original Scale):")
-        print(f"Overall - MAE: {mae:.4f}, RMSE: {rmse:.4f}, MAPE: {mape:.2f}%")
-        
-        for horizon_idx, horizon_name in [(2, "3"), (5, "6"), (11, "12")]:
-            if y_true_unscaled.shape[1] > horizon_idx:
-                y_true_h = y_true_unscaled[:, horizon_idx, :]
-                y_pred_h = y_pred_unscaled[:, horizon_idx, :]
-                mae_h = mean_absolute_error(y_true_h.flatten(), y_pred_h.flatten())
-                rmse_h = np.sqrt(mean_squared_error(y_true_h.flatten(), y_pred_h.flatten()))
-                self.log(f"test_mae_horizon{horizon_name}", mae_h)
-                self.log(f"test_rmse_horizon{horizon_name}", rmse_h)
-                print(f"Horizon {horizon_name} - MAE: {mae_h:.4f}, RMSE: {rmse_h:.4f}")
+        print(f"\nTest Results (Original Scale - Non-Missing Only):")
+        print(f"  MAE: {mae:.4f}")
+        print(f"  RMSE: {rmse:.4f}")
+        print(f"  MAPE: {mape:.2f}%")
         
         # Clear outputs
         self.test_outputs.clear()

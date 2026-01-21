@@ -19,7 +19,7 @@ def main(name_key: str, path_config: PathConfig, code: int = 0):
     # Data parameters
     in_steps = 12   # Input time steps
     out_steps = 12  # Prediction time steps
-    steps_per_day = 288  # 5-minute intervals (24 * 60 / 5 = 288)
+    steps_per_day = 24  # Hourly intervals (24 hours per day)
     batch_size = 32
     
     # Model parameters

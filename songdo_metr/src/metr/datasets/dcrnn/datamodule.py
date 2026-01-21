@@ -1,16 +1,18 @@
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Literal, Optional, Tuple
 
 import lightning as L
 import numpy as np
+import pandas as pd
 from sklearn.preprocessing import StandardScaler
 from torch.utils.data import DataLoader
 
 from metr.components.adj_mx import AdjacencyMatrix
 from metr.components.metr_imc.traffic_data import TrafficData
+from metr.components import MissingMasks
 
-from .dataloader import collate_fn
-from .dataset import DCRNNDataset
+from .dataloader import collate_fn, collate_fn_with_missing
+from .dataset import DCRNNDataset, DCRNNDatasetWithMissing
 
 
 class DCRNNDataModule(L.LightningDataModule):
@@ -235,4 +237,236 @@ class DCRNNDataModule(L.LightningDataModule):
             shuffle=False,
             num_workers=self.num_workers,
             collate_fn=collate_fn,
+        )
+
+
+class DCRNNSplitDataModule(L.LightningDataModule):
+    """DCRNN DataModule with separate training and test dataset files.
+    
+    Training 데이터와 Test 데이터를 별도 파일에서 로드하며,
+    Training 데이터는 비율에 따라 train/validation으로 분할합니다.
+    Test 데이터는 missing mask 정보를 포함하여 보간된 데이터 구분이 가능합니다.
+    
+    Args:
+        training_data_path: Path to training HDF5 file
+        test_data_path: Path to test HDF5 file
+        test_missing_path: Path to test missing mask HDF5 file
+        adj_mx_path: Path to adjacency matrix pickle file
+        seq_len: Number of historical time steps (default: 12)
+        horizon: Number of prediction time steps (default: 12)
+        batch_size: Batch size for training (default: 64)
+        num_workers: Number of DataLoader workers (default: 1)
+        shuffle_training: Whether to shuffle training data (default: True)
+        train_val_split: Train/validation split ratio (default: 0.8)
+        add_time_in_day: Whether to add time-of-day feature (default: True)
+        add_day_in_week: Whether to add day-of-week feature (default: False)
+    """
+
+    def __init__(
+        self,
+        training_data_path: str,
+        test_data_path: str,
+        test_missing_path: str,
+        adj_mx_path: str,
+        seq_len: int = 12,
+        horizon: int = 12,
+        batch_size: int = 64,
+        num_workers: int = 1,
+        shuffle_training: bool = True,
+        train_val_split: float = 0.8,
+        add_time_in_day: bool = True,
+        add_day_in_week: bool = False,
+    ):
+        super().__init__()
+        self.training_data_path = Path(training_data_path)
+        self.test_data_path = Path(test_data_path)
+        self.test_missing_path = Path(test_missing_path)
+        self.adj_mx_path = Path(adj_mx_path)
+
+        self.seq_len = seq_len
+        self.horizon = horizon
+        self.batch_size = batch_size
+        self.num_workers = num_workers
+        self.shuffle_training = shuffle_training
+        self.train_val_split = train_val_split
+        self.add_time_in_day = add_time_in_day
+        self.add_day_in_week = add_day_in_week
+
+        self.adj_mx_raw: Optional[AdjacencyMatrix] = None
+        self._scaler: Optional[StandardScaler] = None
+        self.training_dataset: Optional[DCRNNDataset] = None
+        self.validation_dataset: Optional[DCRNNDataset] = None
+        self.test_dataset: Optional[DCRNNDatasetWithMissing] = None
+
+    @property
+    def scaler(self) -> Optional[StandardScaler]:
+        """Get the fitted scaler."""
+        return self._scaler
+
+    @property
+    def adj_mx(self) -> np.ndarray:
+        """Return the adjacency matrix as numpy array."""
+        if self.adj_mx_raw is None:
+            raise ValueError("DataModule not setup. Call setup() first.")
+        return self.adj_mx_raw.adj_mx
+
+    @property
+    def num_nodes(self) -> int:
+        """Return the number of nodes (sensors)."""
+        if self.adj_mx_raw is None:
+            raise ValueError("DataModule not setup. Call setup() first.")
+        return len(self.adj_mx_raw.sensor_ids)
+
+    @property
+    def input_dim(self) -> int:
+        """Return input dimension (1 + time features)."""
+        dim = 1
+        if self.add_time_in_day:
+            dim += 1
+        if self.add_day_in_week:
+            dim += 7
+        return dim
+
+    @property
+    def output_dim(self) -> int:
+        """Return output dimension (traffic value only)."""
+        return 1
+
+    def _prepare_scaler(self, train_data: np.ndarray) -> None:
+        """Prepare and fit the scaler on training data."""
+        ref_data = train_data.reshape(-1, 1)
+        ref_data = ref_data[~np.isnan(ref_data).any(axis=1)]
+
+        self._scaler = StandardScaler()
+        self._scaler.fit(ref_data)
+
+    def _apply_scaling(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Apply StandardScaler to DataFrame."""
+        assert self._scaler is not None, "Scaler must be fitted before applying scaling"
+        scaled_values = self._scaler.transform(df.values.reshape(-1, 1))
+        scaled_values = scaled_values.reshape(df.shape)
+        return pd.DataFrame(scaled_values, index=df.index, columns=df.columns)
+
+    def _load_training_data(
+        self, ordered_sensor_ids: list
+    ) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """Load training data and split into train/val."""
+        raw = TrafficData.import_from_hdf(str(self.training_data_path))
+        raw_df = raw.data[ordered_sensor_ids]
+
+        total_rows = len(raw_df)
+        split_idx = int(total_rows * self.train_val_split)
+
+        train_df = raw_df.iloc[:split_idx]
+        val_df = raw_df.iloc[split_idx:]
+
+        print(
+            f"Training data split - Train: {len(train_df)} rows "
+            f"({self.train_val_split * 100:.0f}%), "
+            f"Val: {len(val_df)} rows ({(1 - self.train_val_split) * 100:.0f}%)"
+        )
+
+        return train_df, val_df
+
+    def _load_test_data(
+        self, ordered_sensor_ids: list
+    ) -> Tuple[pd.DataFrame, np.ndarray]:
+        """Load test data and missing mask."""
+        raw = TrafficData.import_from_hdf(str(self.test_data_path))
+        raw_df = raw.data[ordered_sensor_ids]
+
+        missing_masks = MissingMasks.import_from_hdf(str(self.test_missing_path))
+        missing_mask_df = missing_masks.data[ordered_sensor_ids]
+
+        missing_mask_aligned = missing_mask_df.reindex(
+            index=raw_df.index, columns=raw_df.columns, fill_value=False
+        )
+
+        print(f"Test data loaded: {len(raw_df)} rows")
+
+        return raw_df, missing_mask_aligned.values
+
+    def setup(
+        self,
+        stage: Optional[Literal["fit", "validate", "test", "predict"]] = None,
+    ):
+        """Setup datasets and scaler."""
+        self.adj_mx_raw = AdjacencyMatrix.import_from_pickle(str(self.adj_mx_path))
+        ordered_sensor_ids = self.adj_mx_raw.sensor_ids
+
+        if stage in ["fit", "validate", None]:
+            train_df, val_df = self._load_training_data(ordered_sensor_ids)
+
+            # Fit scaler on training data
+            self._prepare_scaler(train_df.values)
+
+            # Apply scaling
+            train_df_scaled = self._apply_scaling(train_df)
+            val_df_scaled = self._apply_scaling(val_df)
+
+            self.training_dataset = DCRNNDataset(
+                train_df_scaled,
+                seq_len=self.seq_len,
+                horizon=self.horizon,
+                add_time_in_day=self.add_time_in_day,
+                add_day_in_week=self.add_day_in_week,
+            )
+            self.validation_dataset = DCRNNDataset(
+                val_df_scaled,
+                seq_len=self.seq_len,
+                horizon=self.horizon,
+                add_time_in_day=self.add_time_in_day,
+                add_day_in_week=self.add_day_in_week,
+            )
+
+        if stage in ["test", None]:
+            test_df, test_missing_mask = self._load_test_data(ordered_sensor_ids)
+
+            # Fit scaler if not already fitted
+            if self._scaler is None:
+                train_df, _ = self._load_training_data(ordered_sensor_ids)
+                self._prepare_scaler(train_df.values)
+
+            test_df_scaled = self._apply_scaling(test_df)
+
+            self.test_dataset = DCRNNDatasetWithMissing(
+                test_df_scaled,
+                seq_len=self.seq_len,
+                horizon=self.horizon,
+                add_time_in_day=self.add_time_in_day,
+                add_day_in_week=self.add_day_in_week,
+                missing_mask=test_missing_mask,
+            )
+
+    def train_dataloader(self) -> DataLoader:
+        """Return training DataLoader."""
+        assert self.training_dataset is not None, "Call setup() first"
+        return DataLoader(
+            self.training_dataset,
+            batch_size=self.batch_size,
+            shuffle=self.shuffle_training,
+            num_workers=self.num_workers,
+            collate_fn=collate_fn,
+        )
+
+    def val_dataloader(self) -> DataLoader:
+        """Return validation DataLoader."""
+        assert self.validation_dataset is not None, "Call setup() first"
+        return DataLoader(
+            self.validation_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=self.num_workers,
+            collate_fn=collate_fn,
+        )
+
+    def test_dataloader(self) -> DataLoader:
+        """Return test DataLoader with missing mask support."""
+        assert self.test_dataset is not None, "Call setup() first"
+        return DataLoader(
+            self.test_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=self.num_workers,
+            collate_fn=collate_fn_with_missing,
         )

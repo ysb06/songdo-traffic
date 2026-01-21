@@ -219,6 +219,31 @@ class LSTMLightningModule(L.LightningModule):
             y_true = np.concatenate([x["y_true"] for x in self.test_outputs], axis=0)
             y_pred = np.concatenate([x["y_pred"] for x in self.test_outputs], axis=0)
 
+        # Calculate scaled metrics first (before inverse transform)
+        y_true_scaled_flat = y_true.flatten()
+        y_pred_scaled_flat = y_pred.flatten()
+        
+        mae_scaled = mean_absolute_error(y_true_scaled_flat, y_pred_scaled_flat)
+        rmse_scaled = np.sqrt(mean_squared_error(y_true_scaled_flat, y_pred_scaled_flat))
+        
+        non_zero_mask_scaled = y_true_scaled_flat != 0
+        mape_scaled = (
+            np.mean(np.abs((y_true_scaled_flat[non_zero_mask_scaled] - y_pred_scaled_flat[non_zero_mask_scaled]) / y_true_scaled_flat[non_zero_mask_scaled]))
+            * 100
+            if non_zero_mask_scaled.any()
+            else 0.0
+        )
+        
+        # Log scaled metrics
+        self.log("test_mae_scaled", mae_scaled)
+        self.log("test_rmse_scaled", rmse_scaled)
+        self.log("test_mape_scaled", float(mape_scaled))
+        
+        print(f"\nTest Results (Scaled):")
+        print(f"MAE: {mae_scaled:.4f}")
+        print(f"RMSE: {rmse_scaled:.4f}")
+        print(f"MAPE: {mape_scaled:.2f}%")
+
         # Inverse transform to get original scale values
         if self.scaler is not None:
             # Store original shapes
