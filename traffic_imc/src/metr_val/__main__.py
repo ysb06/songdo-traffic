@@ -149,6 +149,12 @@ if __name__ == "__main__":
         choices=data_list,
         help=f"사용할 특정 데이터 보간 방법 리스트 (기본: 전체). 선택 가능: {', '.join(data_list)}",
     )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=None,
+        help="동시 실행할 최대 작업 수 (기본값: GPU 개수). GPU 개수보다 크게 설정하면 같은 GPU에서 여러 모델 동시 학습",
+    )
     args = parser.parse_args()
 
     # GPU IDs 설정
@@ -157,23 +163,32 @@ if __name__ == "__main__":
     else:
         gpu_ids = list(range(args.num_gpus))
 
+    # Workers 설정
+    num_gpu_ids = len(gpu_ids)
+    max_workers = args.workers if args.workers else num_gpu_ids
+
     # 모델 및 데이터 선택 (None이면 전체 사용)
     active_models = args.models if args.models is not None else model_list
     active_data = args.data_methods if args.data_methods is not None else data_list
-    
+
     tasks = [(d, m) for d in active_data for m in active_models]
     total_tasks = len(tasks)
-    
+
     # 실행 정보 출력
     print("=" * 70)
-    print(f"총 {total_tasks}개 작업 (데이터: {len(active_data)}개 × 모델: {len(active_models)}개)")
+    print(
+        f"총 {total_tasks}개 작업 (데이터: {len(active_data)}개 × 모델: {len(active_models)}개)"
+    )
     print(f"데이터 방법: {', '.join(active_data)}")
     print(f"모델: {', '.join(active_models)}")
     if args.sequential:
         print(f"실행 모드: 순차 실행 (GPU 0)")
     else:
-        print(f"실행 모드: 병렬 실행 (GPU: {gpu_ids}, 동시 실행: {len(gpu_ids)}개)")
-    print(f"타임아웃: {'비활성화' if args.timeout <= 0 else f'{args.timeout}초 ({args.timeout/3600:.1f}시간)'}")
+        jobs_per_gpu = max_workers / num_gpu_ids
+        print(f"실행 모드: 병렬 실행 (GPU: {gpu_ids}, 동시 작업: {max_workers}개, GPU당 ~{jobs_per_gpu:.1f}개)")
+    print(
+        f"타임아웃: {'비활성화' if args.timeout <= 0 else f'{args.timeout}초 ({args.timeout/3600:.1f}시간)'}"
+    )
     print(f"로그 파일: {LOG_FILE}")
     print("=" * 70)
 
@@ -188,19 +203,15 @@ if __name__ == "__main__":
     else:
         # 병렬 실행 (멀티 GPU)
         completed = 0
-
-        with ThreadPoolExecutor(max_workers=len(gpu_ids)) as executor:
-            # 작업 제출: 각 작업을 라운드로빈 방식으로 GPU에 할당
+        
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = {}
             for idx, (data_name, model_type) in enumerate(tasks):
-                gpu_id = gpu_ids[idx % len(gpu_ids)]  # 라운드로빈 GPU 할당
+                # GPU 할당은 여전히 GPU 개수에 맞춰 라운드로빈 실행
+                gpu_id = gpu_ids[idx % num_gpu_ids] 
                 future = executor.submit(
-                    run_model_standalone,
-                    data_name,
-                    model_type,
-                    gpu_id,
-                    args.code,
-                    args.timeout,
+                    run_model_standalone, 
+                    data_name, model_type, gpu_id, args.code, args.timeout
                 )
                 futures[future] = (data_name, model_type, gpu_id)
 
