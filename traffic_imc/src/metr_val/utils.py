@@ -112,3 +112,53 @@ class PathConfig(Mapping[str, _PathSection]):
 
     def __repr__(self) -> str:
         return f"<ConfigPaths root={self._root}>"
+
+
+# ── CLI 유틸리티 ────────────────────────────────────────────────────
+DATA_CONFIG_MAP = {
+    "KNN": "../config_knn.yaml",
+    "MICE": "../config_mice.yaml",
+    "BGCP": "../config_bgcp.yaml",
+    "TRMF": "../config_trmf.yaml",
+    "BRITS": "../config_brits.yaml",
+    "GRIN": "../config_grin.yaml",
+    "BASE": "../config_base.yaml",
+}
+
+
+def get_config_path(data_name: str) -> str:
+    """데이터 이름에 해당하는 config 파일 경로를 반환합니다."""
+    if data_name not in DATA_CONFIG_MAP:
+        raise ValueError(
+            f"Unknown data name: {data_name}. "
+            f"Available options: {list(DATA_CONFIG_MAP.keys())}"
+        )
+    return DATA_CONFIG_MAP[data_name]
+
+
+def parse_training_args():
+    """모델 학습을 위한 CLI 인자를 파싱합니다."""
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Train traffic prediction model")
+    parser.add_argument(
+        "--data", 
+        type=str, 
+        required=True,
+        choices=list(DATA_CONFIG_MAP.keys()),
+        help="Data interpolation method name (e.g., KNN, MICE, BGCP)"
+    )
+    parser.add_argument(
+        "--gpu", 
+        type=int, 
+        default=0,
+        help="GPU device ID to use (default: 0)"
+    )
+    parser.add_argument(
+        "--code",
+        type=int,
+        default=0,
+        help="Run code number for identification (default: 0)"
+    )
+    
+    return parser.parse_args()

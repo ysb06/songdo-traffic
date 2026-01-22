@@ -167,3 +167,18 @@ def main(name_key: str, path_config: PathConfig, code: int = 0):
     print("Training and testing completed!")
     print(f"Best checkpoint: {callbacks[1].best_model_path}")
     print("=" * 60)
+
+
+if __name__ == "__main__":
+    import os
+    from .utils import parse_training_args, get_config_path
+    
+    args = parse_training_args()
+    
+    # GPU 설정
+    os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
+    
+    # Config 로드 및 실행
+    config_path = get_config_path(args.data)
+    path_config = PathConfig.from_yaml(config_path)
+    main(args.data, path_config, code=args.code)
