@@ -63,11 +63,9 @@ class MLCAFormer(nn.Module):
         if dow_embedding_dim > 0:
             self.dow_embedding = nn.Embedding(7, dow_embedding_dim)
         if col_embedding_dim > 0:
-            self.col_embedding = nn.init.xavier_uniform_(
-                nn.Parameter(torch.empty(in_steps, num_nodes, col_embedding_dim))
-            )
+            self.col_embedding = nn.Parameter(torch.empty(in_steps, num_nodes, col_embedding_dim))
+            nn.init.xavier_uniform_(self.col_embedding)
 
-      
         self.output_proj = nn.Linear(
             in_steps * self.model_dim1, out_steps * output_dim
             )

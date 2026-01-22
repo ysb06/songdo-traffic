@@ -143,6 +143,9 @@ class MLCAFormerLightningModule(L.LightningModule):
         x, y = batch
         y_hat: torch.Tensor = self(x)
 
+        if torch.isnan(y_hat).any():
+            print("NaN detected in model output!")
+
         # MLCAFormer output: (batch, out_steps, num_nodes, output_dim)
         # Squeeze output_dim if it's 1
         if y_hat.dim() == 4 and y_hat.size(-1) == 1:

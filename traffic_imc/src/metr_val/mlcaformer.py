@@ -34,7 +34,7 @@ def main(name_key: str, path_config: PathConfig, code: int = 0):
     num_heads = 4
     num_layers = 3
     dropout = 0.1
-    learning_rate = 0.001
+    learning_rate = 0.0001
     
     # Training parameters
     max_epochs = 100
@@ -102,7 +102,7 @@ def main(name_key: str, path_config: PathConfig, code: int = 0):
         EarlyStopping(
             monitor="val_loss",
             mode="min",
-            patience=20,
+            patience=5,
             verbose=True,
         ),
         ModelCheckpoint(
@@ -126,7 +126,8 @@ def main(name_key: str, path_config: PathConfig, code: int = 0):
         callbacks=callbacks,
         log_every_n_steps=10,
         enable_progress_bar=True,
-        precision="16-mixed"
+        precision="16-mixed",
+        gradient_clip_val=1.0
     )
     
     # Train and test
