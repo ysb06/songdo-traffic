@@ -26,7 +26,7 @@ def main(name_key: str, path_config: PathConfig, code: int = 0):
     # Data parameters
     n_his = 12  # Historical time steps
     n_pred = 12  # Prediction time steps (match other models)
-    batch_size = 32
+    batch_size = 64
 
     # Model parameters
     gso_type = "sym_norm_lap"  # GSO type (recommended for STGCN)
