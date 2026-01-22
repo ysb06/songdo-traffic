@@ -27,7 +27,7 @@ def main(name_key: str, path_config: PathConfig, code: int = 0):
         code: Run code number for identification
     """
     # Configuration
-    output_dir = "./output/dcrnn"
+    output_dir = f"./output/dcrnn/{name_key}_{code:02d}"
     
     # Data parameters
     seq_len = 12  # Historical time steps

@@ -103,7 +103,7 @@ def log_result(
                 f"{time.ctime()} | GPU{gpu_id} | {model_type:12} | {data_name:6} | {status:7} | {elapsed:.1f}s\n"
             )
             if not success and error:
-                log.write(f"    ERROR: {error[:500]}\n")
+                log.write(f"    ERROR: {error}\n")
 
 
 if __name__ == "__main__":

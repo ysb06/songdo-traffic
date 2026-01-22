@@ -24,7 +24,7 @@ def main(name_key: str, path_config: PathConfig, code: int = 0):
     # ==========================================================================
     # Configuration
     # ==========================================================================
-    output_dir = "./output/agcrn"
+    output_dir = f"./output/agcrn/{name_key}_{code:02d}"
 
     # Data parameters
     in_steps = 12  # Input time steps (lag)

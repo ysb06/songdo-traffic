@@ -21,7 +21,7 @@ from .models.stgcn.utils import prepare_gso_for_model
 
 def main(name_key: str, path_config: PathConfig, code: int = 0):
     # Configuration
-    output_dir = "./output/stgcn"
+    output_dir = f"./output/stgcn/{name_key}_{code:02d}"
 
     # Data parameters
     n_his = 12  # Historical time steps

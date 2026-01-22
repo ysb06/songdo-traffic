@@ -14,7 +14,7 @@ from metr.utils import PathConfig
 
 def main(name_key: str, path_config: PathConfig, code: int = 0):
     # Configuration
-    output_dir = "./output/mlcaformer"
+    output_dir = f"./output/mlcaformer/{name_key}_{code:02d}"
     
     # Data parameters
     in_steps = 12   # Input time steps
