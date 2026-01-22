@@ -30,10 +30,10 @@ class TemporalAttention(nn.Module):
         attn = (q @ k.transpose(-2, -1)) * self.scale
         if self.causal:
             if hasattr(self, 'causal_mask') and self.causal_mask is not None and T == self.causal_mask.size(0):
-                attn = attn.masked_fill_(self.causal_mask == 0, -1e18)
+                attn = attn.masked_fill_(self.causal_mask == 0, -1e4)
             else:
                 temp_mask = torch.tril(torch.ones(T, T, device=windows_x.device))
-                attn = attn.masked_fill_(temp_mask == 0, -1e18)
+                attn = attn.masked_fill_(temp_mask == 0, -1e4)
         x = (attn.softmax(dim=-1) @ v).transpose(1, 2).reshape(B, T, C)
         x = self.proj(x)
         x = self.proj_drop(x)
@@ -119,7 +119,7 @@ class AttentionLayer(nn.Module):
         attn_score = (query @ key) / self.head_dim ** 0.5
         if self.mask:
             mask = torch.ones(tgt_length, src_length, dtype=torch.bool, device=query.device).tril()
-            attn_score.masked_fill_(~mask, -1e18)
+            attn_score.masked_fill_(~mask, -1e4)
         attn_score = torch.softmax(attn_score, dim=-1)
         out = attn_score @ value
         out = torch.cat(torch.split(out, batch_size, dim=0), dim=-1)
