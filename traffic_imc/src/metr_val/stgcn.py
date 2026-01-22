@@ -7,11 +7,7 @@ from lightning.pytorch.callbacks import (
 )
 from lightning.pytorch.loggers import WandbLogger
 from metr.components.adj_mx import AdjacencyMatrix
-from metr.datasets.stgcn.datamodule import (
-    STGCNDataModule,
-    STGCNDataModuleByDate,
-    STGCNSplitDataModule,
-)
+from metr.datasets.stgcn.datamodule import STGCNSplitDataModule
 
 from metr.utils import PathConfig
 
@@ -122,7 +118,7 @@ def main(name_key: str, path_config: PathConfig, code: int = 0):
         callbacks=callbacks,
         log_every_n_steps=10,
         enable_progress_bar=True,
-        precision="16-mixed"
+        precision="16-mixed",
     )
 
     # Train and test
@@ -145,12 +141,14 @@ def main(name_key: str, path_config: PathConfig, code: int = 0):
 if __name__ == "__main__":
     import os
     from .utils import parse_training_args, get_config_path
-    
+
     args = parse_training_args()
-    
-    # GPU 설정
-    os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
-    
+
+    # GPU 설정 (상위 프로세스에서 설정되지 않은 경우에만)
+    # __main__.py에서 subprocess로 실행 시 이미 CUDA_VISIBLE_DEVICES가 설정됨
+    if "CUDA_VISIBLE_DEVICES" not in os.environ:
+        os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
+
     # Config 로드 및 실행
     config_path = get_config_path(args.data)
     path_config = PathConfig.from_yaml(config_path)

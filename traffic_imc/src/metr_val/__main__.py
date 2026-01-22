@@ -1,3 +1,4 @@
+import os
 import subprocess
 import sys
 import time
@@ -41,6 +42,10 @@ def run_model_standalone(
         str(code),
     ]
 
+    # GPU 환경 변수 자동 주입: 해당 subprocess가 지정된 GPU만 인식하도록 격리
+    env = os.environ.copy()
+    env["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
+
     print(f">>> [GPU {gpu_id}] [실행 중] {model_type.upper()} | 데이터: {data_name}")
     start_time = time.time()
 
@@ -49,7 +54,7 @@ def run_model_standalone(
         # timeout이 0 이하면 타임아웃 비활성화
         run_timeout = timeout if timeout > 0 else None
         result = subprocess.run(
-            cmd, check=True, capture_output=True, text=True, timeout=run_timeout
+            cmd, check=True, capture_output=True, text=True, timeout=run_timeout, env=env
         )
         elapsed = time.time() - start_time
         print(
@@ -171,7 +176,7 @@ if __name__ == "__main__":
     active_models = args.models if args.models is not None else model_list
     active_data = args.data_methods if args.data_methods is not None else data_list
 
-    tasks = [(d, m) for d in active_data for m in active_models]
+    tasks = [(d, m) for m in active_models for d in active_data]
     total_tasks = len(tasks)
 
     # 실행 정보 출력
