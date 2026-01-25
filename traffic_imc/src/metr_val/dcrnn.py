@@ -49,7 +49,7 @@ def main(name_key: str, path_config: PathConfig, code: int = 0):
     # Lower learning rate helps with convergence stability
     learning_rate = 0.001  # Changed from 0.01 - more stable for DCRNN
     weight_decay = 0.0
-    max_epochs = 30
+    max_epochs = 16
     
     # Device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -71,7 +71,7 @@ def main(name_key: str, path_config: PathConfig, code: int = 0):
         seq_len=seq_len,
         horizon=horizon,
         batch_size=batch_size,
-        num_workers=4,
+        num_workers=28,
         shuffle_training=True,
         train_val_split=0.8,
         add_time_in_day=add_time_in_day,
@@ -120,7 +120,7 @@ def main(name_key: str, path_config: PathConfig, code: int = 0):
         EarlyStopping(
             monitor="val_loss",
             mode="min",
-            patience=20,
+            patience=3,
             verbose=True,
         ),
         ModelCheckpoint(
