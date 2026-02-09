@@ -2,13 +2,23 @@
 name = "notebooks"
 version = "0.1.0"
 description = "Default template for PDM package"
-authors = [
-    {name = "Seungbin Yim", email = "ysb06@hotmail.com"},
+authors = [{ name = "Seungbin Yim", email = "ysb06@hotmail.com" }]
+dependencies = [
+    "ipykernel>=6.30.1",
+    "matplotlib>=3.10.5",
+    "geopandas>=1.1.1",
+    "folium>=0.20.0",
+    "mapclassify>=2.10.0",
+    "plotly>=6.3.0",
+    "nbformat>=5.10.4",
+    "h5py>=3.15.1",
+    "missingno>=0.5.2",
+    "statsmodels>=0.14.6",
+    "pycatch22>=0.4.5",
 ]
-dependencies = ["ipykernel>=6.30.1", "matplotlib>=3.10.5", "geopandas>=1.1.1", "folium>=0.20.0", "mapclassify>=2.10.0", "plotly>=6.3.0", "nbformat>=5.10.4", "h5py>=3.15.1", "missingno>=0.5.2"]
 requires-python = "==3.11.*"
 readme = "README.md"
-license = {text = "MIT"}
+license = { text = "MIT" }
 
 
 [tool.pdm]
@@ -19,3 +29,7 @@ dev = [
     "-e file:///${PROJECT_ROOT}/../songdo_metr#egg=songdo-metr",
     "-e file:///${PROJECT_ROOT}/../traffic_imc#egg=traffic-imc",
 ]
+
+[tool.uv.extra-build-dependencies]
+torch-sparse = ["torch"]
+torch-scatter = ["torch"]

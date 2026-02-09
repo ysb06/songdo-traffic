@@ -24,16 +24,15 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Generate Raw Datasets
-# generate_raw_dataset()
+generate_raw_dataset()
 
 # Generate Base Subset Datasets (테스트 용)
 base_subset_path_conf = PathConfig.from_yaml("../config_base.yaml")
-# generate_subset(
-#     subset_path_conf=base_subset_path_conf,
-#     target_data_start="2023-01-26 00:00:00",
-#     cluster_count=1,
-#     missing_rate_threshold=0.9,
-# )
+generate_subset(
+    subset_path_conf=base_subset_path_conf,
+    cluster_count=1,
+    missing_rate_threshold=0.9,
+)
 
 
 # Generate Data Interpolation Subset
@@ -45,7 +44,6 @@ def generate_interpolated_subset(key: str, interpolator: Interpolator):
 
     generate_subset(
         subset_path_conf=subset_path_conf,
-        target_data_start="2023-01-26 00:00:00",
         cluster_count=1,
         missing_rate_threshold=0.9,
         interpolation_processors=interpolation_processors,
@@ -57,12 +55,11 @@ base_adj_mx = AdjacencyMatrix.import_from_pickle(base_subset_path_conf.adj_mx_pa
 base_adj_mx_tensor = torch.tensor(base_adj_mx.adj_mx, dtype=torch.float32)
 
 interpolation_processors: List[Tuple[str, Interpolator]] = [
-    # ("mice", SpatialMICEInterpolator(base_adj_mx)),
-    # ("knn", SpatialKNNInterpolator(base_adj_mx)),
-    # ("bgcp", BGCPInterpolator()),
-    # ("trmf", TRMFInterpolator()),
-    # ("brits", BRITSInterpolator()),
-    ("grin", GRINInterpolator(base_adj_mx_tensor)),
+    ("mice", SpatialMICEInterpolator(base_adj_mx)),
+    ("knn", SpatialKNNInterpolator(base_adj_mx)),
+    ("bgcp", BGCPInterpolator()),
+    ("trmf", TRMFInterpolator()),
+    ("brits", BRITSInterpolator()),
 ]
 for key, interpolator in interpolation_processors:
     logger.info(f'Generating interpolated subset with "{key}" interpolator.')

@@ -17,6 +17,7 @@ dependencies = [
     "networkx>=3.4",
     "requests>=2.32.3",
     "torch==2.8.0",
+    # "torch==2.8.0+cu128",
     "tables>=3.10.1",
     "lightning>=2.5.1",
     "holidays>=0.74",

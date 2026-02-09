@@ -35,7 +35,7 @@ class IMCRTSCollector:
     def collect(
         self,
         ignore_empty: bool = False,
-        req_delay: float = 0.05,
+        req_delay: float = 0.1,
     ) -> None:
         total_size = (self.end_date - self.start_date).days + 1
 
